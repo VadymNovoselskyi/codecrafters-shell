@@ -29,7 +29,7 @@ rl.on("line", async (commandsStr) => {
         console.log(`${searchedCommand} is a shell builtin`);
       } else if (findExecPath(searchedCommand)) {
         const execPath = findExecPath(searchedCommand);
-        console.log(`${searchedCommand} is ${execPath}`);
+        console.log(`${searchedCommand} is ${execPath}/${searchedCommand}`);
       } else {
         console.log(`${searchedCommand}: not found`);
       }
@@ -39,7 +39,7 @@ rl.on("line", async (commandsStr) => {
     default:
       if (findExecPath(command)) {
         const execPath = findExecPath(command);
-        const proc = Bun.spawn([execPath!, ...args]);
+        const proc = Bun.spawn([command, ...args], {cwd: execPath});
         const output = await new Response(proc.stdout).text()
         console.log(output)
       } else {
@@ -72,6 +72,6 @@ function findExecPath(searchedCommand: string): string | undefined {
       continue;
     }
 
-    return `${path}/${searchedCommand}`;
+    return path;
   }
 }
