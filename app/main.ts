@@ -2,7 +2,7 @@ import { createInterface } from "readline";
 import fs from "fs";
 import path from "path";
 
-const builtins = ["echo", "exit", "type"];
+const builtins = ["pwd", "echo", "exit", "type"];
 const rl = createInterface({
   input: process.stdin,
   output: process.stdout,
@@ -15,12 +15,16 @@ rl.on("line", async (commandsStr) => {
   const [command, ...args] = commandsStr.split(" ");
 
   switch (command) {
-    case "exit":
-      rl.close();
+    case "pwd":
+      console.log(__dirname);
+      rl.prompt();
       break;
     case "echo":
       console.log(args.join(" "));
       rl.prompt();
+      break;
+    case "exit":
+      rl.close();
       break;
     case "type":
       const searchedCommand = args[0];
@@ -39,8 +43,8 @@ rl.on("line", async (commandsStr) => {
     default:
       if (findExecPath(command)) {
         const proc = Bun.spawn([command, ...args]);
-        const output = await new Response(proc.stdout).text()
-        process.stdout.write(output)
+        const output = await new Response(proc.stdout).text();
+        process.stdout.write(output);
       } else {
         console.log(`${command}: command not found`);
       }
