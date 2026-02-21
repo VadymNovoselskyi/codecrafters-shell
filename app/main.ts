@@ -5,10 +5,15 @@ import path from "path";
 const builtins = ["cd", "pwd", "echo", "exit", "type"];
 const handlers: Record<string, Function> = {
   cd: (args: string[]) => {
-    if (fs.existsSync(args[0])) {
-      process.chdir(args[0]);
+    let path = args[0];
+    if (path.startsWith("~")) {
+      path = `${process.env.HOME}${path.substring(1)}`;
+    }
+
+    if (fs.existsSync(path)) {
+      process.chdir(path);
     } else {
-      console.log(`cd: ${args[0]}: No such file or directory`);
+      console.log(`cd: ${path}: No such file or directory`);
     }
   },
   pwd: (args: string[]) => console.log(process.cwd()),
