@@ -9,6 +9,16 @@ const rl = createInterface({
 rl.prompt();
 
 rl.on("line", (command) => {
-  console.log(`${command}: command not found`);
-  rl.prompt();
+  switch (command) {
+    case "exit":
+      rl.close();
+      break;
+    default:
+      console.log(`${command}: command not found`);
+      rl.prompt();
+  }
 });
+
+rl.on('close', () => {
+  process.exit(0)
+})
