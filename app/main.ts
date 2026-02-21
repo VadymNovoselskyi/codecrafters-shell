@@ -1,5 +1,6 @@
 import { createInterface } from "readline";
 import fs from "fs";
+import path from "path";
 
 const builtins = ["echo", "exit", "type"];
 const rl = createInterface({
@@ -10,7 +11,7 @@ const rl = createInterface({
 
 rl.prompt();
 
-rl.on("line", (commandsStr) => {
+rl.on("line", async (commandsStr) => {
   const [command, ...args] = commandsStr.split(" ");
 
   switch (command) {
@@ -22,43 +23,29 @@ rl.on("line", (commandsStr) => {
       rl.prompt();
       break;
     case "type":
-      let commandFound = false;
       const searchedCommand = args[0];
 
       if (builtins.includes(searchedCommand)) {
         console.log(`${searchedCommand} is a shell builtin`);
-        commandFound = true;
+      } else if (findExecPath(searchedCommand)) {
+        const execPath = findExecPath(searchedCommand);
+        console.log(`${searchedCommand} is ${execPath}`);
       } else {
-        const paths = process.env.PATH?.split(":");
-        if (!paths) {
-          break;
-        }
-
-        for (const path of paths) {
-          if (!fs.existsSync(path)) continue;
-
-          const contents = fs.readdirSync(path);
-          if (!contents.includes(searchedCommand)) continue;
-
-          try {
-            fs.accessSync(`${path}/${searchedCommand}`, fs.constants.X_OK);
-          } catch {
-            continue;
-          }
-
-          commandFound = true
-          console.log(`${searchedCommand} is ${path}/${searchedCommand}`);
-          break;
-        }
-      }
-
-      if (!commandFound) {
         console.log(`${searchedCommand}: not found`);
       }
+
       rl.prompt();
       break;
     default:
-      console.log(`${command}: command not found`);
+      if (findExecPath(command)) {
+        const execPath = findExecPath(command);
+        const proc = Bun.spawn([execPath!, ...args]);
+        const output = await new Response(proc.stdout).text()
+        console.log(output)
+      } else {
+        console.log(`${command}: command not found`);
+      }
+
       rl.prompt();
   }
 });
@@ -66,3 +53,25 @@ rl.on("line", (commandsStr) => {
 rl.on("close", () => {
   process.exit(0);
 });
+
+function findExecPath(searchedCommand: string): string | undefined {
+  const paths = process.env.PATH?.split(path.delimiter);
+  if (!paths) {
+    return;
+  }
+
+  for (const path of paths) {
+    if (!fs.existsSync(path)) continue;
+
+    const contents = fs.readdirSync(path);
+    if (!contents.includes(searchedCommand)) continue;
+
+    try {
+      fs.accessSync(`${path}/${searchedCommand}`, fs.constants.X_OK);
+    } catch {
+      continue;
+    }
+
+    return `${path}/${searchedCommand}`;
+  }
+}
