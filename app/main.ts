@@ -38,10 +38,9 @@ rl.on("line", async (commandsStr) => {
       break;
     default:
       if (findExecPath(command)) {
-        const execPath = findExecPath(command);
         const proc = Bun.spawn([command, ...args]);
         const output = await new Response(proc.stdout).text()
-        console.log(output)
+        process.stdout.write(output)
       } else {
         console.log(`${command}: command not found`);
       }
