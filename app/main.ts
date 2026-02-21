@@ -55,6 +55,7 @@ rl.on("line", async (commandsStr) => {
 
   rl.prompt();
 });
+
 function findExecPath(searchedCommand: string): string | undefined {
   const paths = process.env.PATH?.split(path.delimiter);
   if (!paths) {
