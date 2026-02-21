@@ -21,10 +21,12 @@ rl.on("line", (commandsStr) => {
       rl.prompt();
       break;
     case "type":
-      builtins.includes(args[0])
-        ? console.log(`${args[0]} is a shell builtin`)
-        : console.log(`${args[0]}: not found`);
-
+      if (builtins.includes(args[0])) {
+        console.log(`${args[0]} is a shell builtin`);
+      } else {
+        console.log(process.env.PATH)
+        console.log(`${args[0]}: command not found`);
+      }
       rl.prompt();
       break;
     default:
