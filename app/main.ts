@@ -2,7 +2,7 @@ import { createInterface } from "readline";
 import fs from "fs";
 import path from "path";
 
-const builtins = ["pwd", "echo", "exit", "type"];
+const builtins = ["cd", "pwd", "echo", "exit", "type"];
 const rl = createInterface({
   input: process.stdin,
   output: process.stdout,
@@ -15,6 +15,14 @@ rl.on("line", async (commandsStr) => {
   const [command, ...args] = commandsStr.split(" ");
 
   switch (command) {
+    case "cd":
+      if (fs.existsSync(args[0])) {
+        process.chdir(args[0]);
+      } else {
+        console.log(`cd: ${args[0]} no such file or directory`);
+      }
+      rl.prompt();
+      break;
     case "pwd":
       console.log(process.cwd());
       rl.prompt();
