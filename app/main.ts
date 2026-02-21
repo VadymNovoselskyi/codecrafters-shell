@@ -16,7 +16,7 @@ rl.on("line", async (commandsStr) => {
 
   switch (command) {
     case "pwd":
-      console.log(__dirname);
+      console.log(process.cwd());
       rl.prompt();
       break;
     case "echo":
