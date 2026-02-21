@@ -3,6 +3,33 @@ import fs from "fs";
 import path from "path";
 
 const builtins = ["cd", "pwd", "echo", "exit", "type"];
+const handlers: Record<string, Function> = {
+  cd: (args: string[]) => {
+    if (fs.existsSync(args[0])) {
+      process.chdir(args[0]);
+    } else {
+      console.log(`cd: ${args[0]}: No such file or directory`);
+    }
+  },
+  pwd: (args: string[]) => console.log(process.cwd()),
+  echo: (args: string[]) => console.log(args.join(" ")),
+  exit: (args: string[]) => {
+    rl.close();
+    process.exit(0);
+  },
+  type: (args: string[]) => {
+    const searchedCommand = args[0];
+    if (builtins.includes(searchedCommand)) {
+      console.log(`${searchedCommand} is a shell builtin`);
+    } else if (findExecPath(searchedCommand)) {
+      const execPath = findExecPath(searchedCommand);
+      console.log(`${searchedCommand} is ${execPath}`);
+    } else {
+      console.log(`${searchedCommand}: not found`);
+    }
+  },
+};
+
 const rl = createInterface({
   input: process.stdin,
   output: process.stdout,
@@ -14,57 +41,20 @@ rl.prompt();
 rl.on("line", async (commandsStr) => {
   const [command, ...args] = commandsStr.split(" ");
 
-  switch (command) {
-    case "cd":
-      if (fs.existsSync(args[0])) {
-        process.chdir(args[0]);
-      } else {
-        console.log(`cd: ${args[0]} no such file or directory`);
-      }
-      rl.prompt();
-      break;
-    case "pwd":
-      console.log(process.cwd());
-      rl.prompt();
-      break;
-    case "echo":
-      console.log(args.join(" "));
-      rl.prompt();
-      break;
-    case "exit":
-      rl.close();
-      break;
-    case "type":
-      const searchedCommand = args[0];
-
-      if (builtins.includes(searchedCommand)) {
-        console.log(`${searchedCommand} is a shell builtin`);
-      } else if (findExecPath(searchedCommand)) {
-        const execPath = findExecPath(searchedCommand);
-        console.log(`${searchedCommand} is ${execPath}`);
-      } else {
-        console.log(`${searchedCommand}: not found`);
-      }
-
-      rl.prompt();
-      break;
-    default:
-      if (findExecPath(command)) {
-        const proc = Bun.spawn([command, ...args]);
-        const output = await new Response(proc.stdout).text();
-        process.stdout.write(output);
-      } else {
-        console.log(`${command}: command not found`);
-      }
-
-      rl.prompt();
+  if (builtins.includes(command)) {
+    handlers[command].call(this, args);
+  } else {
+    if (findExecPath(command)) {
+      const proc = Bun.spawn([command, ...args]);
+      const output = await new Response(proc.stdout).text();
+      process.stdout.write(output);
+    } else {
+      console.log(`${command}: command not found`);
+    }
   }
-});
 
-rl.on("close", () => {
-  process.exit(0);
+  rl.prompt();
 });
-
 function findExecPath(searchedCommand: string): string | undefined {
   const paths = process.env.PATH?.split(path.delimiter);
   if (!paths) {
