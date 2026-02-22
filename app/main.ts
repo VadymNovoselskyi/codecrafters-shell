@@ -13,7 +13,7 @@ const handlers: Record<string, Function> = {
     if (fs.existsSync(path)) {
       process.chdir(path);
     } else {
-      console.log(`cd: ${path}: No such file or directory`);
+      stderr.write(`cd: ${path}: No such file or directory` + "\n");
     }
   },
   pwd: (args: string[]) => stdout.write(process.cwd() + "\n"),
@@ -30,12 +30,13 @@ const handlers: Record<string, Function> = {
       const execPath = findExecPath(searchedCommand);
       stdout.write(`${searchedCommand} is ${execPath}` + "\n");
     } else {
-      stdout.write(`${searchedCommand}: not found` + "\n");
+      stderr.write(`${searchedCommand}: not found` + "\n");
     }
   },
 };
 
 let stdout: NodeJS.WriteStream | fs.WriteStream = process.stdout;
+let stderr: NodeJS.WriteStream | fs.WriteStream = process.stdout;
 const rl = createInterface({
   input: process.stdin,
   output: stdout,
@@ -61,11 +62,13 @@ rl.on("line", async (input) => {
   }
   // console.log(`command: '${command}'; argsUnparsed: "${argsUnparsed.join(" ")}"`);
   let args = normalizeArgs(argsUnparsed.join(" "));
-  if (args.includes(">") || args.includes("1>")) {
+  if (args.includes(">") || args.includes("1>") || args.includes("2>")) {
     const outFile = args[args.length - 1];
     fs.writeFile(outFile, "", { flag: "w+" }, (err) => {});
-
-    stdout = fs.createWriteStream(outFile);
+    
+    if (args.includes("2>")) stderr = fs.createWriteStream(outFile);
+    else stdout = fs.createWriteStream(outFile);
+    
     args.splice(-2);
   }
 
@@ -73,15 +76,20 @@ rl.on("line", async (input) => {
     handlers[command].call(this, args);
   } else {
     if (findExecPath(command)) {
-      const proc = Bun.spawn([command, ...args]);
+      const proc = Bun.spawn([command, ...args], {
+        stdio: ["inherit", "pipe", "pipe"],
+      });
       const output = await new Response(proc.stdout).text();
+      const error = await new Response(proc.stderr).text();
       stdout.write(output);
+      stderr.write(error);
     } else {
-      console.log(`${command}: command not found`);
+      stderr.write(`${command}: command not found` + "\n");
     }
   }
 
   stdout = process.stdout;
+  stderr = process.stdout;
   rl.prompt();
 });
 
