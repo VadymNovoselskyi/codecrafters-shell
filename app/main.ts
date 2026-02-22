@@ -43,8 +43,21 @@ const rl = createInterface({
 
 rl.prompt();
 
-rl.on("line", async (commandsStr) => {
-  const [command, ...argsUnparsed] = commandsStr.split(" ");
+rl.on("line", async (input) => {
+  let command: string, argsUnparsed: string[];
+  if (input.startsWith("'") || input.startsWith('"')) {
+    // This is really not the best thing, but like how do we know what string to normalize?
+    const match = input.match(/'([^']+)'|"([^"]+)"/);
+    if (!match?.[1] && !match?.[2]) {
+      throw Error(`Error parsing input (smth witn quotes): ${input}`);
+    }
+    command = match[1] ?? match[2].replace(/\\(.)/g, "$1");
+    // Also the +3 here will break if more than one \\ escape
+    argsUnparsed = input.substring(command.length + 3).split(" ");
+  } else {
+    [command, ...argsUnparsed] = input.split(" ");
+  }
+  // console.log(`command: '${command}'; argsUnparsed: "${argsUnparsed.join(" ")}"`);
   const args = normalizeArgs(argsUnparsed.join(" "));
 
   if (builtins.includes(command)) {
@@ -69,12 +82,9 @@ function normalizeArgs(argsStr: string): string[] {
   let wordIndex = 0;
   let inSingleQuotes = false;
   let inDoubleQuotes = false;
-  // let inSingleQuotes = false;
 
   for (let i = 0; i < argsStr.length; i++) {
     const char = argsStr[i];
-    // console.log(`char: ${char}`);
-
     if (char == "\'" && !inDoubleQuotes) {
       inSingleQuotes = !inSingleQuotes;
     } else if (char == '"' && !inSingleQuotes) {
@@ -82,11 +92,13 @@ function normalizeArgs(argsStr: string): string[] {
     } else if (char == "\\") {
       if (!inSingleQuotes && !inDoubleQuotes) {
         args[wordIndex] = args[wordIndex].concat(argsStr[++i]);
-      }
-      else if (inSingleQuotes) {
+      } else if (inSingleQuotes) {
         args[wordIndex] = args[wordIndex].concat(argsStr[i]);
-      }
-      else if (inDoubleQuotes && argsStr[i+1] == "\"" || argsStr[i+1] == "\\") {
+      } else if (
+        (inDoubleQuotes && argsStr[i + 1] == '"') ||
+        argsStr[i + 1] == "\\"
+      ) {
+        // We don't yet handle things like vars, newlines etc etc
         args[wordIndex] = args[wordIndex].concat(argsStr[++i]);
       }
     } else if (/\S/.test(char) || inSingleQuotes || inDoubleQuotes) {
@@ -100,27 +112,6 @@ function normalizeArgs(argsStr: string): string[] {
   }
   // console.log(args);
   return args;
-  // // The String.raw`` and otherWordsMatch is gen by ChatGPT
-  // const singleQuotesMatch = String.raw`'[^']+'`;
-  // const singleQuotesCapture = String.raw`'([^']+)'`;
-
-  // const doubleQuotesMatch = String.raw`"[^"]+"`;
-  // const doubleQuotesCapture = String.raw`"([^"]+)"`;
-
-  // const otherWordsMatch = String.raw`((?:${singleQuotesMatch}|${doubleQuotesMatch}|[^\s\\]+|\\.)+)`;
-  // const tokenMatch = new RegExp(
-  //   `${singleQuotesCapture}|${doubleQuotesCapture}|${otherWordsMatch}`,
-  //   "g",
-  // );
-  // const args = [...argsStr.matchAll(tokenMatch)].map((m) => {
-  //   console.log(m);
-  //   return m[1] ?? m[2] ?? m[3].replace(/\\(.)/g, "$1");
-  // });
-
-  // // The backslash stripping is also done by ChatGPT
-  // // return args.map((arg) => arg.replace(/\\(.)/g, "$1"));
-  // console.log(args);
-  // return args;
 }
 
 function findExecPath(searchedCommand: string): string | undefined {
