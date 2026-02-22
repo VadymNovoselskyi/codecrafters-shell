@@ -45,9 +45,11 @@ rl.prompt();
 
 rl.on("line", async (commandsStr) => {
   const [command, ...argsQuoted] = commandsStr.split(" ");
-  const argsStr = argsQuoted.join(" ").replace(/''/g, "");
-  const tokenMatch = /'([^']+)'|(\S+)/g;
-  const args = [...argsStr.matchAll(tokenMatch)].map((m) => m[1] ?? m[2]);
+  const argsStr = argsQuoted.join(" ").replace(/''|""/g, "");
+  const tokenMatch = /'([^']+)'|"([^"]+)"|(\S+)/g;
+  const args = [...argsStr.matchAll(tokenMatch)].map(
+    (m) => m.slice(1).find((x) => x !== undefined)!,
+  );
 
   if (builtins.includes(command)) {
     handlers[command].call(this, args);
