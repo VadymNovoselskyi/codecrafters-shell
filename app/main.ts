@@ -94,6 +94,9 @@ function normalizeArgs(argsStr: string): string[] {
       else if (inSingleQuotes) {
         args[wordIndex] = args[wordIndex].concat(argsStr[i]);
       }
+      else if (inDoubleQuotes && argsStr[i+1] == "\"" || argsStr[i+1] == "\\") {
+        args[wordIndex] = args[wordIndex].concat(argsStr[++i]);
+      }
     } else if (/\S/.test(char) || inSingleQuotes || inDoubleQuotes) {
       args[wordIndex] = args[wordIndex].concat(char);
     } else if (char == " " && args[wordIndex].length !== 0) {
