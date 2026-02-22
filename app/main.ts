@@ -78,9 +78,9 @@ rl.on("line", async (input) => {
 
     fs.writeFileSync(outFile, "", { flag });
 
-    if (args.includes("2>"))
-      stderr = fs.createWriteStream(outFile, { flags: flag});
-    else stdout = fs.createWriteStream(outFile, {flags: flag});
+    if (args.includes("2>") || args.includes("2>>"))
+      stderr = fs.createWriteStream(outFile, { flags: flag });
+    else stdout = fs.createWriteStream(outFile, { flags: flag });
 
     args.splice(-2);
   }
