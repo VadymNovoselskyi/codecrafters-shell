@@ -62,13 +62,26 @@ rl.on("line", async (input) => {
   }
   // console.log(`command: '${command}'; argsUnparsed: "${argsUnparsed.join(" ")}"`);
   let args = normalizeArgs(argsUnparsed.join(" "));
-  if (args.includes(">") || args.includes("1>") || args.includes("2>")) {
+  if (
+    args.includes(">") ||
+    args.includes("1>") ||
+    args.includes("2>") ||
+    args.includes(">>") ||
+    args.includes("1>>") ||
+    args.includes("2>>")
+  ) {
     const outFile = args[args.length - 1];
-    fs.writeFile(outFile, "", { flag: "w+" }, (err) => {});
-    
-    if (args.includes("2>")) stderr = fs.createWriteStream(outFile);
-    else stdout = fs.createWriteStream(outFile);
-    
+    const flag =
+      args.includes(">") || args.includes("1>") || args.includes("2>")
+        ? "w+"
+        : "a+";
+
+    fs.writeFileSync(outFile, "", { flag });
+
+    if (args.includes("2>"))
+      stderr = fs.createWriteStream(outFile, { flags: flag});
+    else stdout = fs.createWriteStream(outFile, {flags: flag});
+
     args.splice(-2);
   }
 
