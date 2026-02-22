@@ -44,7 +44,10 @@ const rl = createInterface({
 rl.prompt();
 
 rl.on("line", async (commandsStr) => {
-  const [command, ...args] = commandsStr.split(" ");
+  const [command, ...argsQuoted] = commandsStr.split(" ");
+  const argsStr = argsQuoted.join(" ").replace(/''/g, "");
+  const tokenMatch = /'([^']+)'|(\S+)/g;
+  const args = [...argsStr.matchAll(tokenMatch)].map((m) => m[1] ?? m[2]);
 
   if (builtins.includes(command)) {
     handlers[command].call(this, args);
