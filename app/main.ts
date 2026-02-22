@@ -44,12 +44,8 @@ const rl = createInterface({
 rl.prompt();
 
 rl.on("line", async (commandsStr) => {
-  const [command, ...argsQuoted] = commandsStr.split(" ");
-  const argsStr = argsQuoted.join(" ").replace(/''|""/g, "");
-  const tokenMatch = /'([^']+)'|"([^"]+)"|(\S+)/g;
-  const args = [...argsStr.matchAll(tokenMatch)].map(
-    (m) => m.slice(1).find((x) => x !== undefined)!,
-  );
+  const [command, ...argsUnparsed] = commandsStr.split(" ");
+  const args = normalizeArgs(argsUnparsed.join(" "));
 
   if (builtins.includes(command)) {
     handlers[command].call(this, args);
@@ -65,6 +61,19 @@ rl.on("line", async (commandsStr) => {
 
   rl.prompt();
 });
+
+function normalizeArgs(argsStr: string): string[] {
+  argsStr = argsStr.replace(/''|""/g, "");
+
+  // The last sequence is gen by ChatGPT
+  const tokenMatch = /'([^']+)'|"([^"]+)"|((?:[^\s\\]+|\\.)+)/g;
+  const args = [...argsStr.matchAll(tokenMatch)].map(
+    (m) => m.slice(1).find((x) => x !== undefined)!,
+  );
+
+  // The backslash stripping is also done by ChatGPT
+  return args.map((arg) => arg.replace(/\\(.)/g, "$1"));
+}
 
 function findExecPath(searchedCommand: string): string | undefined {
   const paths = process.env.PATH?.split(path.delimiter);
