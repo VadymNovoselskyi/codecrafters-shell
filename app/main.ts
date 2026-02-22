@@ -16,8 +16,8 @@ const handlers: Record<string, Function> = {
       console.log(`cd: ${path}: No such file or directory`);
     }
   },
-  pwd: (args: string[]) => console.log(process.cwd()),
-  echo: (args: string[]) => console.log(args.join(" ")),
+  pwd: (args: string[]) => stdout.write(process.cwd() + "\n"),
+  echo: (args: string[]) => stdout.write(args.join(" ") + "\n"),
   exit: (args: string[]) => {
     rl.close();
     process.exit(0);
@@ -25,19 +25,20 @@ const handlers: Record<string, Function> = {
   type: (args: string[]) => {
     const searchedCommand = args[0];
     if (builtins.includes(searchedCommand)) {
-      console.log(`${searchedCommand} is a shell builtin`);
+      stdout.write(`${searchedCommand} is a shell builtin` + "\n");
     } else if (findExecPath(searchedCommand)) {
       const execPath = findExecPath(searchedCommand);
-      console.log(`${searchedCommand} is ${execPath}`);
+      stdout.write(`${searchedCommand} is ${execPath}` + "\n");
     } else {
-      console.log(`${searchedCommand}: not found`);
+      stdout.write(`${searchedCommand}: not found` + "\n");
     }
   },
 };
 
+let stdout: NodeJS.WriteStream | fs.WriteStream = process.stdout;
 const rl = createInterface({
   input: process.stdin,
-  output: process.stdout,
+  output: stdout,
   prompt: "$ ",
 });
 
@@ -52,13 +53,21 @@ rl.on("line", async (input) => {
       throw Error(`Error parsing input (smth witn quotes): ${input}`);
     }
     command = match[1] ?? match[2].replace(/\\(.)/g, "$1");
+
     // Also the +3 here will break if more than one \\ escape
     argsUnparsed = input.substring(command.length + 3).split(" ");
   } else {
     [command, ...argsUnparsed] = input.split(" ");
   }
   // console.log(`command: '${command}'; argsUnparsed: "${argsUnparsed.join(" ")}"`);
-  const args = normalizeArgs(argsUnparsed.join(" "));
+  let args = normalizeArgs(argsUnparsed.join(" "));
+  if (args.includes(">") || args.includes("1>")) {
+    const outFile = args[args.length - 1];
+    fs.writeFile(outFile, "", { flag: "w+" }, (err) => {});
+
+    stdout = fs.createWriteStream(outFile);
+    args.splice(-2);
+  }
 
   if (builtins.includes(command)) {
     handlers[command].call(this, args);
@@ -66,12 +75,13 @@ rl.on("line", async (input) => {
     if (findExecPath(command)) {
       const proc = Bun.spawn([command, ...args]);
       const output = await new Response(proc.stdout).text();
-      process.stdout.write(output);
+      stdout.write(output);
     } else {
       console.log(`${command}: command not found`);
     }
   }
 
+  stdout = process.stdout;
   rl.prompt();
 });
 
