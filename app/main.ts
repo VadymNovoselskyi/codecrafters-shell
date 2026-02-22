@@ -77,16 +77,8 @@ function normalizeArgs(argsStr: string): string[] {
 
     if (char == "\'" && !inDoubleQuotes) {
       inSingleQuotes = !inSingleQuotes;
-      if (!inSingleQuotes && i !== argsStr.length - 1) {
-        args.push("");
-        wordIndex++;
-      }
     } else if (char == '"' && !inSingleQuotes) {
       inDoubleQuotes = !inDoubleQuotes;
-      if (!inDoubleQuotes && i !== argsStr.length - 1) {
-        args.push("");
-        wordIndex++;
-      }
     } else if (char == "\\") {
       if (!inSingleQuotes && !inDoubleQuotes) {
         args[wordIndex] = args[wordIndex].concat(argsStr[++i]);
