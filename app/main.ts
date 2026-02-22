@@ -65,14 +65,67 @@ rl.on("line", async (commandsStr) => {
 function normalizeArgs(argsStr: string): string[] {
   argsStr = argsStr.replace(/''|""/g, "");
 
-  // The last sequence is gen by ChatGPT
-  const tokenMatch = /'([^']+)'|"([^"]+)"|((?:[^\s\\]+|\\.)+)/g;
-  const args = [...argsStr.matchAll(tokenMatch)].map(
-    (m) => m.slice(1).find((x) => x !== undefined)!,
-  );
+  const args: string[] = [""];
+  let wordIndex = 0;
+  let inSingleQuotes = false;
+  let inDoubleQuotes = false;
+  // let inSingleQuotes = false;
 
-  // The backslash stripping is also done by ChatGPT
-  return args.map((arg) => arg.replace(/\\(.)/g, "$1"));
+  for (let i = 0; i < argsStr.length; i++) {
+    const char = argsStr[i];
+    // console.log(`char: ${char}`);
+
+    if (char == "\'" && !inDoubleQuotes) {
+      inSingleQuotes = !inSingleQuotes;
+      if (!inSingleQuotes && i !== argsStr.length - 1) {
+        args.push("");
+        wordIndex++;
+      }
+    } else if (char == '"' && !inSingleQuotes) {
+      inDoubleQuotes = !inDoubleQuotes;
+      if (!inDoubleQuotes && i !== argsStr.length - 1) {
+        args.push("");
+        wordIndex++;
+      }
+    } else if (char == "\\") {
+      if (!inSingleQuotes && !inDoubleQuotes) {
+        args[wordIndex] = args[wordIndex].concat(argsStr[++i]);
+      }
+      else if (inSingleQuotes) {
+        args[wordIndex] = args[wordIndex].concat(argsStr[i]);
+      }
+    } else if (/\S/.test(char) || inSingleQuotes || inDoubleQuotes) {
+      args[wordIndex] = args[wordIndex].concat(char);
+    } else if (char == " " && args[wordIndex].length !== 0) {
+      args.push("");
+      wordIndex++;
+    } else {
+      // console.log(`Can't match char: "${char}"`);
+    }
+  }
+  // console.log(args);
+  return args;
+  // // The String.raw`` and otherWordsMatch is gen by ChatGPT
+  // const singleQuotesMatch = String.raw`'[^']+'`;
+  // const singleQuotesCapture = String.raw`'([^']+)'`;
+
+  // const doubleQuotesMatch = String.raw`"[^"]+"`;
+  // const doubleQuotesCapture = String.raw`"([^"]+)"`;
+
+  // const otherWordsMatch = String.raw`((?:${singleQuotesMatch}|${doubleQuotesMatch}|[^\s\\]+|\\.)+)`;
+  // const tokenMatch = new RegExp(
+  //   `${singleQuotesCapture}|${doubleQuotesCapture}|${otherWordsMatch}`,
+  //   "g",
+  // );
+  // const args = [...argsStr.matchAll(tokenMatch)].map((m) => {
+  //   console.log(m);
+  //   return m[1] ?? m[2] ?? m[3].replace(/\\(.)/g, "$1");
+  // });
+
+  // // The backslash stripping is also done by ChatGPT
+  // // return args.map((arg) => arg.replace(/\\(.)/g, "$1"));
+  // console.log(args);
+  // return args;
 }
 
 function findExecPath(searchedCommand: string): string | undefined {
