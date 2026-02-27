@@ -74,13 +74,20 @@ function handleAutocomplete(line: string) {
   const [command, args] = parseInput(line);
 
   if (args.length === 1 && !args[0]) {
-    const hits = builtins
+    const builtinHits = builtins
       .filter((cmd) => cmd.startsWith(command))
       .map((hit) => hit + " ");
-    // console.log(`command: ${command}; hits: ${hits.length ? hits : builtins}`)
-    if (!hits.length) stdout.write("\x07");
-    return [hits.length ? hits : [command], command];
+
+    if (builtinHits.length) return [builtinHits, command];
+
+    const pathHits = getPathExecs()
+      .filter((cmd) => cmd.startsWith(command))
+      .map((hit) => hit + " ");
+    if (!pathHits.length) stdout.write("\x07");
+
+    return [pathHits.length ? pathHits : [command], command];
   }
+
   return ["", args.join(" ")];
 }
 
@@ -189,4 +196,27 @@ function findExecPath(searchedCommand: string): string | undefined {
 
     return `${path}/${searchedCommand}`;
   }
+}
+
+function getPathExecs(): string[] {
+  const results: string[] = [];
+  const paths = process.env.PATH?.split(path.delimiter);
+  if (!paths) {
+    return [];
+  }
+
+  for (const path of paths) {
+    if (!fs.existsSync(path)) continue;
+
+    const executables = fs.readdirSync(path);
+    for (const executable of executables) {
+      try {
+        fs.accessSync(`${path}/${executable}`, fs.constants.X_OK);
+        if (!results.includes(executable)) results.push(executable);
+      } catch {
+        continue;
+      }
+    }
+  }
+  return results;
 }
