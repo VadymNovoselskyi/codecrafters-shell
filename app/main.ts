@@ -41,11 +41,49 @@ const rl = createInterface({
   input: process.stdin,
   output: stdout,
   prompt: "$ ",
+  completer: handleAutocomplete,
 });
-
 rl.prompt();
 
 rl.on("line", async (input) => {
+  const [command, args] = parseInput(input);
+  handleStreamRedirect(args);
+
+  if (builtins.includes(command)) {
+    handlers[command].call(this, args);
+  } else {
+    if (findExecPath(command)) {
+      const proc = Bun.spawn([command, ...args], {
+        stdio: ["inherit", "pipe", "pipe"],
+      });
+      const output = await new Response(proc.stdout).text();
+      const error = await new Response(proc.stderr).text();
+      stdout.write(output);
+      stderr.write(error);
+    } else {
+      stderr.write(`${command}: command not found` + "\n");
+    }
+  }
+
+  stdout = process.stdout;
+  stderr = process.stdout;
+  rl.prompt();
+});
+
+function handleAutocomplete(line: string) {
+  const [command, args] = parseInput(line);
+
+  if (args.length === 1 && !args[0]) {
+    const hits = builtins
+      .filter((cmd) => cmd.startsWith(command))
+      .map((hit) => hit + " ");
+    // console.log(`command: ${command}; hits: ${hits.length ? hits : builtins}`)
+    return [hits.length ? hits : builtins, command];
+  }
+  return ["", args.join(" ")];
+}
+
+function parseInput(input: string): [string, string[]] {
   let command: string, argsUnparsed: string[];
   if (input.startsWith("'") || input.startsWith('"')) {
     // This is really not the best thing, but like how do we know what string to normalize?
@@ -61,7 +99,12 @@ rl.on("line", async (input) => {
     [command, ...argsUnparsed] = input.split(" ");
   }
   // console.log(`command: '${command}'; argsUnparsed: "${argsUnparsed.join(" ")}"`);
-  let args = normalizeArgs(argsUnparsed.join(" "));
+  const args = normalizeArgs(argsUnparsed.join(" "));
+
+  return [command, args];
+}
+
+function handleStreamRedirect(args: string[]): void {
   if (
     args.includes(">") ||
     args.includes("1>") ||
@@ -84,27 +127,7 @@ rl.on("line", async (input) => {
 
     args.splice(-2);
   }
-
-  if (builtins.includes(command)) {
-    handlers[command].call(this, args);
-  } else {
-    if (findExecPath(command)) {
-      const proc = Bun.spawn([command, ...args], {
-        stdio: ["inherit", "pipe", "pipe"],
-      });
-      const output = await new Response(proc.stdout).text();
-      const error = await new Response(proc.stderr).text();
-      stdout.write(output);
-      stderr.write(error);
-    } else {
-      stderr.write(`${command}: command not found` + "\n");
-    }
-  }
-
-  stdout = process.stdout;
-  stderr = process.stdout;
-  rl.prompt();
-});
+}
 
 function normalizeArgs(argsStr: string): string[] {
   argsStr = argsStr.replace(/''|""/g, "");
