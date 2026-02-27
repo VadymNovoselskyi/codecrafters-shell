@@ -81,6 +81,11 @@ function handleAutocomplete(line: string) {
     if (!builtinHits.length) stdout.write("\x07");
     else if (builtinHits.length === 1) return [[builtinHits[0] + " "], command];
     else {
+      const longestPrefix = getLongestPrefix(command, builtinHits);
+      if (longestPrefix) {
+        return [[command + longestPrefix], command];
+      }
+
       stdout.write("\n" + builtinHits.join("  ") + "\n");
       rl.write(null, { ctrl: true, name: "u" }); // clear current input line in rl
       rl.prompt();
@@ -95,6 +100,11 @@ function handleAutocomplete(line: string) {
     if (!pathHits.length) return [[], command];
     else if (pathHits.length === 1) return [[pathHits[0] + " "], command];
     else {
+      const longestPrefix = getLongestPrefix(command, pathHits);
+      if (longestPrefix) {
+        return [[command + longestPrefix], command];
+      }
+
       stdout.write("\n" + pathHits.join("  ") + "\n");
       rl.write(null, { ctrl: true, name: "u" }); // clear current input line in rl
       rl.prompt();
@@ -234,4 +244,23 @@ function getPathExecs(): string[] {
     }
   }
   return results;
+}
+
+function getLongestPrefix(start: string, execs: string[]): string {
+  let result = "";
+
+  let index = start.length;
+  while (true) {
+    const letters = execs.reduce(
+      (letters: Record<string, number>, exec: string) => {
+        letters[exec[index]] ??= 1;
+        return letters;
+      },
+      {},
+    );
+    if (Object.keys(letters).length !== 1) break;
+    result = result.concat(Object.keys(letters)[0]);
+    index++;
+  }
+  return result;
 }
