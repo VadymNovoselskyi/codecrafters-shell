@@ -78,7 +78,8 @@ function handleAutocomplete(line: string) {
       .filter((cmd) => cmd.startsWith(command))
       .map((hit) => hit + " ");
     // console.log(`command: ${command}; hits: ${hits.length ? hits : builtins}`)
-    return [hits.length ? hits : builtins, command];
+    if (!hits.length) stdout.write("\x07");
+    return [hits.length ? hits : [command], command];
   }
   return ["", args.join(" ")];
 }
