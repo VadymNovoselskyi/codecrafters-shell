@@ -76,19 +76,34 @@ function handleAutocomplete(line: string) {
   if (args.length === 1 && !args[0]) {
     const builtinHits = builtins
       .filter((cmd) => cmd.startsWith(command))
-      .map((hit) => hit + " ");
+      .sort();
 
-    if (builtinHits.length) return [builtinHits, command];
+    if (!builtinHits.length) stdout.write("\x07");
+    else if (builtinHits.length === 1) return [[builtinHits[0] + " "], command];
+    else {
+      stdout.write("\n" + builtinHits.join("  ") + "\n");
+      rl.write(null, { ctrl: true, name: "u" }); // clear current input line in rl
+      rl.prompt();
+      rl.write(command);
+      return [[], command];
+    }
 
     const pathHits = getPathExecs()
       .filter((cmd) => cmd.startsWith(command))
-      .map((hit) => hit + " ");
-    if (!pathHits.length) stdout.write("\x07");
+      .sort();
 
-    return [pathHits.length ? pathHits : [command], command];
+    if (!pathHits.length) return [[], command];
+    else if (pathHits.length === 1) return [[pathHits[0] + " "], command];
+    else {
+      stdout.write("\n" + pathHits.join("  ") + "\n");
+      rl.write(null, { ctrl: true, name: "u" }); // clear current input line in rl
+      rl.prompt();
+      rl.write(command);
+      return [[], command];
+    }
   }
 
-  return ["", args.join(" ")];
+  return [[""], args.join(" ")];
 }
 
 function parseInput(input: string): [string, string[]] {
