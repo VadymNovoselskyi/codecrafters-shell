@@ -164,8 +164,7 @@ async function run(
   }
 
   if (findExecPath(command)) {
-    // TODO:
-    const proc = spawn(command, args.length && args[0] ? args : [], {
+    const proc = spawn(command, args, {
       stdio: [stdin ? "pipe" : "inherit", "pipe", "pipe"],
     });
 
