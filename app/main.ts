@@ -59,10 +59,11 @@ const handlers: Record<string, Function> = {
       return;
     } else if (args[0] === "-w" || args[0] === "-a") {
       const filepath = args[1];
-      const stream = fs.createWriteStream(filepath, {
-        flags: args[0] === "-w" ? "w+" : "a+",
-      });
-      stream.write(history.slice(lastAppendedIdx).join("\n") + "\n");
+      fs.writeFileSync(
+        filepath,
+        history.slice(lastAppendedIdx).join("\n") + "\n",
+        { flag: args[0] === "-w" ? "w+" : "a+" },
+      );
       lastAppendedIdx = history.length;
     }
 
@@ -139,8 +140,11 @@ rl.on("line", async (input) => {
 
 rl.on("close", () => {
   if (process.env.HISTFILE) {
-    const stream = fs.createWriteStream(process.env.HISTFILE, { flags: "w+" });
-    stream.write(history.slice(lastAppendedIdx).join("\n") + "\n");
+    fs.writeFileSync(
+      process.env.HISTFILE,
+      history.slice(lastAppendedIdx).join("\n") + "\n",
+      { flag: "w+" },
+    );
   }
   process.exit(0);
 });

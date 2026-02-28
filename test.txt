@@ -6,3 +6,7 @@ history
 history -a test.txt
 echo after last append
 history -a test.txt
+exit
+history
+echo new shit
+exit
