@@ -252,7 +252,7 @@ function handleAutocomplete(line: string) {
     return [[], line];
   } else if (fileHits.length === 1) {
     return [
-      [fileHits[0].concat(fs.lstatSync(fileHits[0]).isDirectory() ? "/ " : " ")],
+      [fileHits[0].concat(fs.lstatSync(fileHits[0]).isDirectory() ? "/" : " ")],
       filename,
     ];
   } else {
