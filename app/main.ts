@@ -75,10 +75,7 @@ const handlers: Record<string, Function> = {
     args: string[],
     stdout: NodeJS.WritableStream,
     stderr: NodeJS.WritableStream,
-  ) => {
-    rl.close();
-    process.exit(0);
-  },
+  ) => rl.close(),
   type: (
     args: string[],
     stdout: NodeJS.WritableStream,
@@ -138,6 +135,14 @@ rl.on("line", async (input) => {
     await runs[runs.length - 1];
   }
   rl.prompt();
+});
+
+rl.on("close", () => {
+  if (process.env.HISTFILE) {
+    const stream = fs.createWriteStream(process.env.HISTFILE, { flags: "w+" });
+    stream.write(history.slice(lastAppendedIdx).join("\n") + "\n");
+  }
+  process.exit(0);
 });
 
 async function run(
