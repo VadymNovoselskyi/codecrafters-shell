@@ -6,10 +6,12 @@ import { PassThrough } from "stream";
 
 const history: string[] = [];
 let lastAppendedIdx = 0;
-fs.readFile(process.env.HISTFILE!, "utf-8", (err, data) => {
-  if (err) return;
-  history.push(...data.split("\n").filter(Boolean));
-});
+if (process.env.HISTFILE) {
+  fs.readFile(process.env.HISTFILE, "utf-8", (err, data) => {
+    if (err) return;
+    history.push(...data.split("\n").filter(Boolean));
+  });
+}
 
 const builtins = ["cd", "pwd", "echo", "history", "exit", "type"];
 const handlers: Record<string, Function> = {
