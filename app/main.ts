@@ -100,6 +100,8 @@ const rl = createInterface({
   prompt: "$ ",
   completer: handleAutocomplete,
 });
+let lastTabLine = "";
+let sameLineTabCount = 0;
 rl.prompt();
 
 rl.on("line", async (input) => {
@@ -192,6 +194,13 @@ async function run(
 }
 
 function handleAutocomplete(line: string) {
+  if (line === lastTabLine) {
+    sameLineTabCount++;
+  } else {
+    lastTabLine = line;
+    sameLineTabCount = 1;
+  }
+
   const pipes = parseInput(line);
   const [command, args] = pipes[pipes.length - 1];
 
@@ -262,7 +271,11 @@ function handleAutocomplete(line: string) {
       filename,
     ];
   } else {
-    fs.writeSync(1, "\x07");
+    if (sameLineTabCount === 1) {
+      fs.writeSync(1, "\x07");
+      return [[], line];
+    }
+
     const longestPrefix = getLongestPrefix(filename, fileHits);
     if (longestPrefix) {
       return [[filename + longestPrefix], filename];
