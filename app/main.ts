@@ -38,8 +38,8 @@ const handlers: Record<string, Function> = {
     stdout: NodeJS.WritableStream,
     stderr: NodeJS.WritableStream,
   ) => {
-    const amount = Number(args[0] ?? history.length);
-    for (let i = Math.max(0, history.length - amount); i < history.length; i++) {
+    const amount = Math.min(history.length, Number(args[0] || history.length));
+    for (let i = history.length - amount; i < history.length; i++) {
       stdout.write(`    ${i + 1}  ${history[i]}\n`);
     }
   },
