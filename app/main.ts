@@ -38,6 +38,19 @@ const handlers: Record<string, Function> = {
     stdout: NodeJS.WritableStream,
     stderr: NodeJS.WritableStream,
   ) => {
+    if (args[0] === "-r") {
+      const filepath = args[1];
+      fs.readFile(filepath, "utf-8", (err, data) => {
+        if (err) {
+          stderr.write(`Error reading file: ${err}`);
+          return;
+        }
+        
+        history.push(...data.split("\n").filter(Boolean));
+      });
+      return;
+    }
+
     const amount = Math.min(history.length, Number(args[0] || history.length));
     for (let i = history.length - amount; i < history.length; i++) {
       stdout.write(`    ${i + 1}  ${history[i]}\n`);
@@ -84,12 +97,14 @@ rl.on("line", async (input) => {
 
   for (let i = 0; i < stages.length; i++) {
     const [command, args] = stages[i];
-    const { stdout, stderr } = handleStreamRedirect(args);
+    const { stdout: redirectedStdout, stderr: redirectedStderr } =
+      handleStreamRedirect(args);
 
     const isLastStage = i === stages.length - 1;
-    const nextPipe = !isLastStage && !stdout ? new PassThrough() : undefined;
-    const stdoutTarget = stdout ?? nextPipe ?? process.stdout;
-    const stderrTarget = stderr ?? process.stderr;
+    const nextPipe =
+      !isLastStage && !redirectedStdout ? new PassThrough() : undefined;
+    const stdoutTarget = redirectedStdout ?? nextPipe ?? process.stdout;
+    const stderrTarget = redirectedStderr ?? process.stderr;
 
     runs.push(run(command, args, upstream, stdoutTarget, stderrTarget));
 
