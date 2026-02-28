@@ -250,8 +250,12 @@ function handleAutocomplete(line: string) {
   if (!fileHits.length) {
     process.stdout.write("\x07");
     return [[], line];
-  } else if (fileHits.length === 1) return [[fileHits[0] + " "], filename];
-  else {
+  } else if (fileHits.length === 1) {
+    return [
+      [fileHits[0].concat(fs.lstatSync(fileHits[0]).isDirectory() ? "/ " : " ")],
+      filename,
+    ];
+  } else {
     const longestPrefix = getLongestPrefix(filename, fileHits);
     if (longestPrefix) {
       return [[filename + longestPrefix], filename];
