@@ -194,6 +194,7 @@ async function run(
 }
 
 function handleAutocomplete(line: string) {
+  // Codex's solutions to some strange race condition for codecrafters' tests
   if (line === lastTabLine) {
     sameLineTabCount++;
   } else {
@@ -271,14 +272,14 @@ function handleAutocomplete(line: string) {
       filename,
     ];
   } else {
-    if (sameLineTabCount === 1) {
-      fs.writeSync(1, "\x07");
-      return [[], line];
-    }
-
+    fs.writeSync(1, "\x07");
     const longestPrefix = getLongestPrefix(filename, fileHits);
     if (longestPrefix) {
       return [[filename + longestPrefix], filename];
+    }
+
+    if (sameLineTabCount === 1) {
+      return [[], line];
     }
 
     const completions =
