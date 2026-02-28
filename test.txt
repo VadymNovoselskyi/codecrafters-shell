@@ -1,6 +1,8 @@
-echo hiu
-echo hi1
-echo hi2
-echo hi3
+before append
+echo hi
+echo hi123
+echo hi12345
 history
-history -w test.txt
+history -a test.txt
+echo after last append
+history -a test.txt

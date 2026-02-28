@@ -5,6 +5,8 @@ import { spawn } from "child_process";
 import { PassThrough } from "stream";
 
 const history: string[] = [];
+let lastAppendedIdx = 0;
+
 const builtins = ["cd", "pwd", "echo", "history", "exit", "type"];
 const handlers: Record<string, Function> = {
   cd: (
@@ -49,10 +51,13 @@ const handlers: Record<string, Function> = {
         history.push(...data.split("\n").filter(Boolean));
       });
       return;
-    } else if (args[0] === "-w") {
+    } else if (args[0] === "-w" || args[0] === "-a") {
       const filepath = args[1];
-      const stream = fs.createWriteStream(filepath, { flags: "w+" });
-      stream.write(history.join("\n") + "\n");
+      const stream = fs.createWriteStream(filepath, {
+        flags: args[0] === "-w" ? "w+" : "a+",
+      });
+      stream.write(history.slice(lastAppendedIdx).join("\n") + "\n");
+      lastAppendedIdx = history.length;
     }
 
     const amount = Math.min(history.length, Number(args[0] || history.length));
