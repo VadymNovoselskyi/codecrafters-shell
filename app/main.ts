@@ -1,10 +1,16 @@
 import { createInterface } from "readline";
 import fs from "fs";
 import path from "path";
+import { spawn } from "child_process";
+import { PassThrough } from "stream";
 
 const builtins = ["cd", "pwd", "echo", "exit", "type"];
 const handlers: Record<string, Function> = {
-  cd: (args: string[]) => {
+  cd: (
+    args: string[],
+    stdout: NodeJS.WritableStream,
+    stderr: NodeJS.WritableStream,
+  ) => {
     let path = args[0];
     if (path.startsWith("~")) {
       path = `${process.env.HOME}${path.substring(1)}`;
@@ -16,13 +22,29 @@ const handlers: Record<string, Function> = {
       stderr.write(`cd: ${path}: No such file or directory` + "\n");
     }
   },
-  pwd: (args: string[]) => stdout.write(process.cwd() + "\n"),
-  echo: (args: string[]) => stdout.write(args.join(" ") + "\n"),
-  exit: (args: string[]) => {
+  pwd: (
+    args: string[],
+    stdout: NodeJS.WritableStream,
+    stderr: NodeJS.WritableStream,
+  ) => stdout.write(process.cwd() + "\n"),
+  echo: (
+    args: string[],
+    stdout: NodeJS.WritableStream,
+    stderr: NodeJS.WritableStream,
+  ) => stdout.write(args.join(" ") + "\n"),
+  exit: (
+    args: string[],
+    stdout: NodeJS.WritableStream,
+    stderr: NodeJS.WritableStream,
+  ) => {
     rl.close();
     process.exit(0);
   },
-  type: (args: string[]) => {
+  type: (
+    args: string[],
+    stdout: NodeJS.WritableStream,
+    stderr: NodeJS.WritableStream,
+  ) => {
     const searchedCommand = args[0];
     if (builtins.includes(searchedCommand)) {
       stdout.write(`${searchedCommand} is a shell builtin` + "\n");
@@ -35,50 +57,99 @@ const handlers: Record<string, Function> = {
   },
 };
 
-let stdout: NodeJS.WriteStream | fs.WriteStream = process.stdout;
-let stderr: NodeJS.WriteStream | fs.WriteStream = process.stdout;
 const rl = createInterface({
   input: process.stdin,
-  output: stdout,
+  output: process.stdout,
   prompt: "$ ",
   completer: handleAutocomplete,
 });
 rl.prompt();
 
 rl.on("line", async (input) => {
-  const [command, args] = parseInput(input);
-  handleStreamRedirect(args);
+  const stages = parseInput(input);
+  const runs: Promise<number>[] = [];
+  let upstream: NodeJS.ReadableStream | undefined;
 
-  if (builtins.includes(command)) {
-    handlers[command].call(this, args);
-  } else {
-    if (findExecPath(command)) {
-      const proc = Bun.spawn([command, ...args], {
-        stdio: ["inherit", "pipe", "pipe"],
-      });
-      const output = await new Response(proc.stdout).text();
-      const error = await new Response(proc.stderr).text();
-      stdout.write(output);
-      stderr.write(error);
-    } else {
-      stderr.write(`${command}: command not found` + "\n");
+  for (let i = 0; i < stages.length; i++) {
+    const [command, args] = stages[i];
+    const { stdout, stderr } = handleStreamRedirect(args);
+
+    const isLastStage = i === stages.length - 1;
+    const nextPipe = !isLastStage && !stdout ? new PassThrough() : undefined;
+    const stdoutTarget = stdout ?? nextPipe ?? process.stdout;
+    const stderrTarget = stderr ?? process.stderr;
+
+    runs.push(run(command, args, upstream, stdoutTarget, stderrTarget));
+
+    if (!isLastStage) {
+      if (nextPipe) {
+        upstream = nextPipe;
+      } else {
+        const empty = new PassThrough();
+        empty.end();
+        upstream = empty;
+      }
     }
   }
 
-  stdout = process.stdout;
-  stderr = process.stdout;
+  if (runs.length > 0) {
+    await runs[runs.length - 1];
+  }
   rl.prompt();
 });
 
+async function run(
+  command: string,
+  args: string[],
+  stdin: NodeJS.ReadableStream | undefined,
+  stdout: NodeJS.WritableStream,
+  stderr: NodeJS.WritableStream,
+): Promise<number> {
+  if (builtins.includes(command)) {
+    handlers[command](args, stdout, stderr);
+    if (stdout !== process.stdout) stdout.end();
+    if (stderr !== process.stderr) stderr.end();
+    return 0;
+  }
+
+  if (findExecPath(command)) {
+    const proc = spawn(command, args.length && args[0] ? args : [], {
+      stdio: [stdin ? "pipe" : "inherit", "pipe", "pipe"],
+    });
+
+    if (stdin) {
+      stdin.pipe(proc.stdin!);
+    }
+
+    if (proc.stdout) {
+      proc.stdout.pipe(stdout, { end: stdout !== process.stdout });
+    }
+    if (proc.stderr) {
+      proc.stderr.pipe(stderr, { end: stderr !== process.stderr });
+    }
+
+    return await new Promise<number>((resolve) => {
+      proc.on("close", (code) => resolve(code ?? 0));
+      proc.on("error", () => resolve(1));
+    });
+  }
+
+  stderr.write(`${command}: command not found` + "\n");
+  if (stderr !== process.stderr) stderr.end();
+  if (stdout !== process.stdout) stdout.end();
+  return 127;
+}
+
 function handleAutocomplete(line: string) {
-  const [command, args] = parseInput(line);
+  const pipes = parseInput(line);
+  const [command, args] = pipes[pipes.length - 1];
 
   if (args.length === 1 && !args[0]) {
     const builtinHits = builtins
       .filter((cmd) => cmd.startsWith(command))
       .sort();
 
-    if (!builtinHits.length) stdout.write("\x07");
+    if (!builtinHits.length) process.stdout.write("\x07");
     else if (builtinHits.length === 1) return [[builtinHits[0] + " "], command];
     else {
       const longestPrefix = getLongestPrefix(command, builtinHits);
@@ -86,7 +157,7 @@ function handleAutocomplete(line: string) {
         return [[command + longestPrefix], command];
       }
 
-      stdout.write("\n" + builtinHits.join("  ") + "\n");
+      process.stdout.write("\n" + builtinHits.join("  ") + "\n");
       rl.write(null, { ctrl: true, name: "u" }); // clear current input line in rl
       rl.prompt();
       rl.write(command);
@@ -105,7 +176,7 @@ function handleAutocomplete(line: string) {
         return [[command + longestPrefix], command];
       }
 
-      stdout.write("\n" + pathHits.join("  ") + "\n");
+      process.stdout.write("\n" + pathHits.join("  ") + "\n");
       rl.write(null, { ctrl: true, name: "u" }); // clear current input line in rl
       rl.prompt();
       rl.write(command);
@@ -113,52 +184,70 @@ function handleAutocomplete(line: string) {
     }
   }
 
-  return [[""], args.join(" ")];
+  return [[], args.join(" ")];
 }
 
-function parseInput(input: string): [string, string[]] {
-  let command: string, argsUnparsed: string[];
-  if (input.startsWith("'") || input.startsWith('"')) {
-    // This is really not the best thing, but like how do we know what string to normalize?
-    const match = input.match(/'([^']+)'|"([^"]+)"/);
-    if (!match?.[1] && !match?.[2]) {
-      throw Error(`Error parsing input (smth witn quotes): ${input}`);
+function parseInput(input: string): [string, string[]][] {
+  const results: [string, string[]][] = [];
+  for (const pipe of input.split(" | ")) {
+    let command: string, argsUnparsed: string[];
+    if (pipe.startsWith("'") || pipe.startsWith('"')) {
+      // This is really not the best thing, but like how do we know what string to normalize?
+      const match = pipe.match(/'([^']+)'|"([^"]+)"/);
+      if (!match?.[1] && !match?.[2]) {
+        throw Error(`Error parsing input (smth witn quotes): ${pipe}`);
+      }
+      command = match[1] ?? match[2].replace(/\\(.)/g, "$1");
+
+      // Also the +3 here will break if more than one \\ escape
+      argsUnparsed = pipe.substring(command.length + 3).split(" ");
+    } else {
+      [command, ...argsUnparsed] = pipe.split(" ");
     }
-    command = match[1] ?? match[2].replace(/\\(.)/g, "$1");
+    // console.log(`command: '${command}'; argsUnparsed: "${argsUnparsed.join(" ")}"`);
+    const args = normalizeArgs(argsUnparsed.join(" "));
 
-    // Also the +3 here will break if more than one \\ escape
-    argsUnparsed = input.substring(command.length + 3).split(" ");
-  } else {
-    [command, ...argsUnparsed] = input.split(" ");
+    results.push([command, args]);
   }
-  // console.log(`command: '${command}'; argsUnparsed: "${argsUnparsed.join(" ")}"`);
-  const args = normalizeArgs(argsUnparsed.join(" "));
-
-  return [command, args];
+  return results;
 }
 
-function handleStreamRedirect(args: string[]): void {
+function handleStreamRedirect(args: string[]): {
+  stdout: NodeJS.WritableStream | undefined;
+  stderr: NodeJS.WritableStream | undefined;
+} {
   if (
-    args.includes(">") ||
-    args.includes("1>") ||
-    args.includes("2>") ||
-    args.includes(">>") ||
-    args.includes("1>>") ||
-    args.includes("2>>")
-  ) {
-    const outFile = args[args.length - 1];
-    const flag =
-      args.includes(">") || args.includes("1>") || args.includes("2>")
-        ? "w+"
-        : "a+";
+    !(
+      args.includes(">") ||
+      args.includes("1>") ||
+      args.includes("2>") ||
+      args.includes(">>") ||
+      args.includes("1>>") ||
+      args.includes("2>>")
+    )
+  )
+    return { stdout: undefined, stderr: undefined };
 
-    fs.writeFileSync(outFile, "", { flag });
+  const outFile = args[args.length - 1];
+  const flag =
+    args.includes(">") || args.includes("1>") || args.includes("2>")
+      ? "w+"
+      : "a+";
 
-    if (args.includes("2>") || args.includes("2>>"))
-      stderr = fs.createWriteStream(outFile, { flags: flag });
-    else stdout = fs.createWriteStream(outFile, { flags: flag });
+  fs.writeFileSync(outFile, "", { flag });
 
+  if (args.includes("2>") || args.includes("2>>")) {
     args.splice(-2);
+    return {
+      stdout: undefined,
+      stderr: fs.createWriteStream(outFile, { flags: flag }),
+    };
+  } else {
+    args.splice(-2);
+    return {
+      stdout: fs.createWriteStream(outFile, { flags: flag }),
+      stderr: undefined,
+    };
   }
 }
 
