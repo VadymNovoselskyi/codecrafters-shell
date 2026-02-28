@@ -196,7 +196,7 @@ function handleAutocomplete(line: string) {
   const pipes = parseInput(line);
   const [command, args] = pipes[pipes.length - 1];
 
-  if (args.length === 1 && !args[0]) {
+  if (!args.length) {
     const builtinHits = builtins
       .filter((cmd) => cmd.startsWith(command))
       .sort();
@@ -243,6 +243,8 @@ function handleAutocomplete(line: string) {
     cwd = filepath.substring(0, filepath.lastIndexOf("/"));
     filename = filepath.substring(filepath.lastIndexOf("/") + 1);
   } else cwd = process.cwd();
+  if (!fs.existsSync(cwd)) return [[], line];
+
   const files = fs.readdirSync(cwd);
   const fileHits = files.filter((file) => file.startsWith(filename)).sort();
 
