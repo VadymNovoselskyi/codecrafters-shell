@@ -235,7 +235,26 @@ function handleAutocomplete(line: string) {
     }
   }
 
-  return [[], args.join(" ")];
+  const filename = args[args.length - 1];
+  const files = fs.readdirSync(process.cwd());
+  const fileHits = files.filter((file) => file.startsWith(filename)).sort();
+
+  if (!fileHits.length) {
+    process.stdout.write("\x07");
+    return [[], line];
+  } else if (fileHits.length === 1) return [[fileHits[0] + " "], filename];
+  else {
+    const longestPrefix = getLongestPrefix(filename, fileHits);
+    if (longestPrefix) {
+      return [[filename + longestPrefix], filename];
+    }
+
+    process.stdout.write("\n" + fileHits.join("  ") + "\n");
+    rl.write(null, { ctrl: true, name: "u" }); // clear current input line in rl
+    rl.prompt();
+    rl.write(line);
+    return [[], line];
+  }
 }
 
 function parseInput(input: string): [string, string[]][] {
