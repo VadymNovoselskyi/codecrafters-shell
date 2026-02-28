@@ -1,0 +1,6 @@
+echo hiu
+echo hi1
+echo hi2
+echo hi3
+history
+history -w test.txt

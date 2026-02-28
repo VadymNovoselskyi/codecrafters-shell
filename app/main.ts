@@ -45,10 +45,14 @@ const handlers: Record<string, Function> = {
           stderr.write(`Error reading file: ${err}`);
           return;
         }
-        
+
         history.push(...data.split("\n").filter(Boolean));
       });
       return;
+    } else if (args[0] === "-w") {
+      const filepath = args[1];
+      const stream = fs.createWriteStream(filepath, { flags: "w+" });
+      stream.write(history.join("\n") + "\n");
     }
 
     const amount = Math.min(history.length, Number(args[0] || history.length));
