@@ -4,6 +4,7 @@ import path from "path";
 import { spawn } from "child_process";
 import { PassThrough } from "stream";
 
+const history: string[] = [];
 const builtins = ["cd", "pwd", "echo", "history", "exit", "type"];
 const handlers: Record<string, Function> = {
   cd: (
@@ -36,7 +37,11 @@ const handlers: Record<string, Function> = {
     args: string[],
     stdout: NodeJS.WritableStream,
     stderr: NodeJS.WritableStream,
-  ) => stdout.write(args.join(" ") + "\n"),
+  ) => {
+    for (let i = 0; i < history.length; i++) {
+      stdout.write(`    ${i + 1}  ${history[i]}\n`);
+    }
+  },
   exit: (
     args: string[],
     stdout: NodeJS.WritableStream,
@@ -71,6 +76,7 @@ const rl = createInterface({
 rl.prompt();
 
 rl.on("line", async (input) => {
+  history.push(input);
   const stages = parseInput(input);
   const runs: Promise<number>[] = [];
   let upstream: NodeJS.ReadableStream | undefined;
