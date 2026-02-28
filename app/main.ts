@@ -195,7 +195,7 @@ function handleAutocomplete(line: string) {
   const pipes = parseInput(line);
   const [command, args] = pipes[pipes.length - 1];
 
-  if (!args.length) {
+  if (!args.length && !line.endsWith(" ")) {
     const builtinHits = builtins
       .filter((cmd) => cmd.startsWith(command))
       .sort();
@@ -235,24 +235,30 @@ function handleAutocomplete(line: string) {
     }
   }
 
-  const filepath = args[args.length - 1];
+  const filepath = args[args.length - 1] ?? "";
   let filename = filepath;
   let cwd: string;
   if (filepath.includes("/")) {
     cwd = filepath.substring(0, filepath.lastIndexOf("/"));
-    filename = filepath.substring(filepath.lastIndexOf("/") + 1);
+    filename = filepath.substring(filepath.lastIndexOf("/") + 1) ?? "";
   } else cwd = process.cwd();
   if (!fs.existsSync(cwd)) return [[], line];
 
   const files = fs.readdirSync(cwd);
-  const fileHits = files.filter((file) => file.startsWith(filename)).sort();
+  const fileHits = filename
+    ? files.filter((file) => file.startsWith(filename)).sort()
+    : files;
 
   if (!fileHits.length) {
     process.stdout.write("\x07");
     return [[], line];
   } else if (fileHits.length === 1) {
     return [
-      [fileHits[0].concat(fs.lstatSync(fileHits[0]).isDirectory() ? "/" : " ")],
+      [
+        fileHits[0].concat(
+          fs.lstatSync(`${cwd}/${fileHits[0]}`).isDirectory() ? "/" : " ",
+        ),
+      ],
       filename,
     ];
   } else {
