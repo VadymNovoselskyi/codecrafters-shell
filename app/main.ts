@@ -4,7 +4,7 @@ import path from "path";
 import { spawn } from "child_process";
 import { PassThrough } from "stream";
 
-const builtins = ["cd", "pwd", "echo", "exit", "type"];
+const builtins = ["cd", "pwd", "echo", "history", "exit", "type"];
 const handlers: Record<string, Function> = {
   cd: (
     args: string[],
@@ -28,6 +28,11 @@ const handlers: Record<string, Function> = {
     stderr: NodeJS.WritableStream,
   ) => stdout.write(process.cwd() + "\n"),
   echo: (
+    args: string[],
+    stdout: NodeJS.WritableStream,
+    stderr: NodeJS.WritableStream,
+  ) => stdout.write(args.join(" ") + "\n"),
+  history: (
     args: string[],
     stdout: NodeJS.WritableStream,
     stderr: NodeJS.WritableStream,
