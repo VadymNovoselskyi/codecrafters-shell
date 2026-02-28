@@ -200,7 +200,7 @@ function handleAutocomplete(line: string) {
       .filter((cmd) => cmd.startsWith(command))
       .sort();
 
-    if (!builtinHits.length) process.stdout.write("\x07");
+    if (!builtinHits.length) fs.writeSync(1, "\x07");
     else if (builtinHits.length === 1) return [[builtinHits[0] + " "], command];
     else {
       const longestPrefix = getLongestPrefix(command, builtinHits);
@@ -208,7 +208,7 @@ function handleAutocomplete(line: string) {
         return [[command + longestPrefix], command];
       }
 
-      process.stdout.write("\n" + builtinHits.join("  ") + "\n");
+      fs.writeSync(1, "\n" + builtinHits.join("  ") + "\n");
       rl.write(null, { ctrl: true, name: "u" }); // clear current input line in rl
       rl.prompt();
       rl.write(command);
@@ -227,7 +227,7 @@ function handleAutocomplete(line: string) {
         return [[command + longestPrefix], command];
       }
 
-      process.stdout.write("\n" + pathHits.join("  ") + "\n");
+      fs.writeSync(1, "\n" + pathHits.join("  ") + "\n");
       rl.write(null, { ctrl: true, name: "u" }); // clear current input line in rl
       rl.prompt();
       rl.write(command);
@@ -250,7 +250,7 @@ function handleAutocomplete(line: string) {
     : files;
 
   if (!fileHits.length) {
-    process.stdout.write("\x07");
+    fs.writeSync(1, "\x07");
     return [[], line];
   } else if (fileHits.length === 1) {
     return [
@@ -262,12 +262,21 @@ function handleAutocomplete(line: string) {
       filename,
     ];
   } else {
+    fs.writeSync(1, "\x07");
     const longestPrefix = getLongestPrefix(filename, fileHits);
     if (longestPrefix) {
       return [[filename + longestPrefix], filename];
     }
 
-    process.stdout.write("\n" + fileHits.join("  ") + "\n");
+    const completions =
+      "\n" +
+      fileHits
+        .map((file) =>
+          file.concat(fs.lstatSync(`${cwd}/${file}`).isDirectory() ? "/" : ""),
+        )
+        .join("  ") +
+      "\n";
+    fs.writeSync(1, completions);
     rl.write(null, { ctrl: true, name: "u" }); // clear current input line in rl
     rl.prompt();
     rl.write(line);
