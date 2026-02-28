@@ -164,6 +164,7 @@ async function run(
   }
 
   if (findExecPath(command)) {
+    // TODO:
     const proc = spawn(command, args.length && args[0] ? args : [], {
       stdio: [stdin ? "pipe" : "inherit", "pipe", "pipe"],
     });
@@ -235,8 +236,14 @@ function handleAutocomplete(line: string) {
     }
   }
 
-  const filename = args[args.length - 1];
-  const files = fs.readdirSync(process.cwd());
+  const filepath = args[args.length - 1];
+  let filename = filepath;
+  let cwd: string;
+  if (filepath.includes("/")) {
+    cwd = filepath.substring(0, filepath.lastIndexOf("/"));
+    filename = filepath.substring(filepath.lastIndexOf("/") + 1);
+  } else cwd = process.cwd();
+  const files = fs.readdirSync(cwd);
   const fileHits = files.filter((file) => file.startsWith(filename)).sort();
 
   if (!fileHits.length) {
@@ -357,7 +364,7 @@ function normalizeArgs(argsStr: string): string[] {
     }
   }
   // console.log(args);
-  return args;
+  return args.filter(Boolean);
 }
 
 function findExecPath(searchedCommand: string): string | undefined {
