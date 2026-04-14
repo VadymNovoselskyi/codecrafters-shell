@@ -15,7 +15,12 @@ export function handleAutocomplete(
 	ui: AutocompleteUi,
 ): [string[], string] {
 	const pipes = parseInput(line);
-	const [command, args] = pipes[pipes.length - 1];
+	let { command, args, nextCommand } = pipes[pipes.length - 1];
+	while (nextCommand) {
+		command = nextCommand.command;
+		args = nextCommand.args;
+		nextCommand = nextCommand.nextCommand;
+	}
 
 	if (!args.length && !line.endsWith(" ")) {
 		return handleCommandAutocomplete(command, ui);

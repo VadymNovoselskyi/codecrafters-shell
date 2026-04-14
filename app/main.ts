@@ -120,29 +120,23 @@ async function run(
 		// console.log(
 		// 	`Original: command: ${command}; args: ${args.join(", ")}; nextCommand: ${JSON.stringify(nextCommand)}`,
 		// );
-		const proc = spawn(command, args, {
-			stdio: [stdin ? "pipe" : "inherit", "pipe", "pipe"],
-		});
-		if (stdin) stdin.pipe(proc.stdin!);
-
 		if (runInBackground) {
-			proc.on("close", () => {
-				// console.log("Orig closed, running the next one: ");
-
-				if (proc.stdout) {
-					proc.stdout.pipe(stdout, { end: stdout !== process.stdout });
-				}
-				if (proc.stderr) {
-					proc.stderr.pipe(stderr, { end: stderr !== process.stderr });
-				}
-				runNextOrEnd(nextCommand, stdout, stderr);
-			});
-
-			stdout.write(`[${shellState.backgroundJobSeq}] ${proc.pid}\n`);
+			const pid = runBackgroundProcess(
+				{ command, args, nextCommand },
+				stdout,
+				stderr,
+				stdin,
+			);
+			stdout.write(`[${shellState.backgroundJobSeq}] ${pid}\n`);
 
 			shellState.backgroundJobSeq += 1;
 			return 0;
 		}
+
+		const proc = spawn(command, args, {
+			stdio: [stdin ? "pipe" : "inherit", "pipe", "pipe"],
+		});
+		if (stdin) stdin.pipe(proc.stdin!);
 
 		if (proc.stdout) {
 			proc.stdout.pipe(stdout, { end: stdout !== process.stdout });
@@ -183,38 +177,45 @@ function shouldRunInBackground(
 	return runInBackground;
 }
 
-function runNextOrEnd(
+function runBackgroundProcess(
 	commandObj: CommandObj | undefined,
 	stdout: NodeJS.WritableStream,
 	stderr: NodeJS.WritableStream,
-) {
+	stdin?: NodeJS.ReadableStream,
+): number | undefined {
 	if (!commandObj) return;
 	// console.log(
 	// 	`Next: command: ${commandObj.command}; args: ${commandObj.args.join(", ")}`,
 	// );
 
 	const proc = spawn(commandObj.command, commandObj.args, {
-		stdio: ["inherit", "pipe", "pipe"],
+		stdio: [stdin ? "pipe" : "inherit", "pipe", "pipe"],
 	});
+	if (stdin) stdin.pipe(proc.stdin!);
 
-	proc.stdout.on("data", (chunk: Buffer | string) => {
-		stdout.write(chunk);
-	});
-	proc.stdout.on("end", () => {
-		if (stdout !== process.stdout) stdout.end();
-	});
-
-	proc.stderr.on("data", (chunk: Buffer | string) => {
-		stderr.write(chunk);
-	});
-	proc.stderr.on("end", () => {
-		if (stderr !== process.stderr) stderr.end();
-	});
+	if (proc.stdout) {
+		proc.stdout.on("data", (chunk: Buffer | string) => {
+			stdout.write(chunk);
+		});
+		proc.stdout.on("end", () => {
+			if (stdout !== process.stdout) stdout.end();
+		});
+	}
+	if (proc.stderr) {
+		proc.stderr.on("data", (chunk: Buffer | string) => {
+			stderr.write(chunk);
+		});
+		proc.stderr.on("end", () => {
+			if (stderr !== process.stderr) stderr.end();
+		});
+	}
 
 	proc.on("close", () => {
 		// console.log(`command ${commandObj.command} closed`);
-		runNextOrEnd(commandObj.nextCommand, stdout, stderr);
+		runBackgroundProcess(commandObj.nextCommand, stdout, stderr);
 	});
+
+	return proc.pid;
 }
 
 function handleStreamRedirect(args: string[]): {
