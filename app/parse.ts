@@ -1,24 +1,39 @@
-export function parseInput(input: string): [string, string[]][] {
-	const results: [string, string[]][] = [];
+export type CommandObj = {
+	command: string;
+	args: string[];
+	nextCommand?: CommandObj;
+};
+
+export function parseInput(input: string): CommandObj[] {
+	const results: CommandObj[] = [];
 
 	for (const pipe of input.split(" | ")) {
-		let command: string;
-		let argsUnparsed: string[];
+		let prevCommand: CommandObj | null = null;
 
-		if (pipe.startsWith("'") || pipe.startsWith('"')) {
-			const match = pipe.match(/'([^']+)'|"([^"]+)"/);
-			if (!match?.[1] && !match?.[2]) {
-				throw Error(`Error parsing input (smth witn quotes): ${pipe}`);
+		for (const commandObj of pipe.split(" && ")) {
+			let command: string;
+			let argsUnparsed: string[];
+
+			if (commandObj.startsWith("'") || commandObj.startsWith('"')) {
+				const match = commandObj.match(/'([^']+)'|"([^"]+)"/);
+				if (!match?.[1] && !match?.[2]) {
+					throw Error(`Error parsing input (smth witn quotes): ${commandObj}`);
+				}
+
+				command = (match[1] ?? match[2]).replace(/\\(.)/g, "$1");
+				argsUnparsed = commandObj.substring(command.length + 3).split(" ");
+			} else {
+				[command, ...argsUnparsed] = commandObj.split(" ");
 			}
 
-			command = (match[1] ?? match[2]).replace(/\\(.)/g, "$1");
-			argsUnparsed = pipe.substring(command.length + 3).split(" ");
-		} else {
-			[command, ...argsUnparsed] = pipe.split(" ");
-		}
+			const args = normalizeArgs(argsUnparsed.join(" "));
 
-		const args = normalizeArgs(argsUnparsed.join(" "));
-		results.push([command, args]);
+			const commandResult: CommandObj = { command, args };
+			if (prevCommand) prevCommand.nextCommand = commandResult;
+			else results.push(commandResult);
+
+			prevCommand = commandResult;
+		}
 	}
 
 	return results;

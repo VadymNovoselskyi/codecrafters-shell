@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { spawn } from "child_process";
+import { ChildProcess, spawn } from "child_process";
 import { PassThrough } from "stream";
 import {
 	isBuiltin,
@@ -10,7 +10,7 @@ import {
 	type ShellState,
 } from "./builtins";
 import { handleAutocomplete } from "./autocomplete";
-import { parseInput } from "./parse";
+import { parseInput, type CommandObj } from "./parse";
 import { createInterface } from "readline";
 
 const shellState: ShellState = {
@@ -47,7 +47,7 @@ rl.on("line", async (input) => {
 	let upstream: NodeJS.ReadableStream | undefined;
 
 	for (let i = 0; i < stages.length; i++) {
-		const [command, args] = stages[i];
+		const { command, args, nextCommand } = stages[i];
 		const { stdout: redirectedStdout, stderr: redirectedStderr } =
 			handleStreamRedirect(args);
 
@@ -57,7 +57,9 @@ rl.on("line", async (input) => {
 		const stdoutTarget = redirectedStdout ?? nextPipe ?? process.stdout;
 		const stderrTarget = redirectedStderr ?? process.stderr;
 
-		runs.push(run(command, args, upstream, stdoutTarget, stderrTarget));
+		runs.push(
+			run(command, args, nextCommand, upstream, stdoutTarget, stderrTarget),
+		);
 
 		if (shellState.exitRequested) {
 			break;
@@ -94,15 +96,12 @@ rl.on("close", () => {
 async function run(
 	command: string,
 	args: string[],
+	nextCommand: CommandObj | undefined,
 	stdin: NodeJS.ReadableStream | undefined,
 	stdout: NodeJS.WritableStream,
 	stderr: NodeJS.WritableStream,
 ): Promise<number> {
-	let runInBackground = false;
-	if (args[args.length - 1] === "&") {
-		args.pop();
-		runInBackground = true;
-	}
+	const runInBackground = shouldRunInBackground(args, nextCommand);
 
 	if (isBuiltin(command) && !runInBackground) {
 		runBuiltin(command, args, {
@@ -118,19 +117,32 @@ async function run(
 	}
 
 	if (findExecPath(command)) {
+		// console.log(
+		// 	`Original: command: ${command}; args: ${args.join(", ")}; nextCommand: ${JSON.stringify(nextCommand)}`,
+		// );
 		const proc = spawn(command, args, {
 			stdio: [stdin ? "pipe" : "inherit", "pipe", "pipe"],
 		});
+		if (stdin) stdin.pipe(proc.stdin!);
 
 		if (runInBackground) {
+			proc.on("close", () => {
+				// console.log("Orig closed, running the next one: ");
+
+				if (proc.stdout) {
+					proc.stdout.pipe(stdout, { end: stdout !== process.stdout });
+				}
+				if (proc.stderr) {
+					proc.stderr.pipe(stderr, { end: stderr !== process.stderr });
+				}
+				runNextOrEnd(nextCommand, stdout, stderr);
+			});
+
 			stdout.write(`[${shellState.backgroundJobSeq}] ${proc.pid}\n`);
-			if (stdout !== process.stdout) stdout.end();
 
 			shellState.backgroundJobSeq += 1;
 			return 0;
 		}
-
-		if (stdin) stdin.pipe(proc.stdin!);
 
 		if (proc.stdout) {
 			proc.stdout.pipe(stdout, { end: stdout !== process.stdout });
@@ -149,6 +161,60 @@ async function run(
 	if (stderr !== process.stderr) stderr.end();
 	if (stdout !== process.stdout) stdout.end();
 	return 127;
+}
+
+function shouldRunInBackground(
+	args: string[],
+	nextCommand: CommandObj | undefined,
+): boolean {
+	let runInBackground = false;
+	let _args: string[] | undefined = args;
+
+	do {
+		if (_args[_args.length - 1] === "&") {
+			_args.pop();
+			runInBackground = true;
+			break;
+		}
+
+		_args = nextCommand?.args;
+		nextCommand = nextCommand?.nextCommand;
+	} while (_args);
+	return runInBackground;
+}
+
+function runNextOrEnd(
+	commandObj: CommandObj | undefined,
+	stdout: NodeJS.WritableStream,
+	stderr: NodeJS.WritableStream,
+) {
+	if (!commandObj) return;
+	// console.log(
+	// 	`Next: command: ${commandObj.command}; args: ${commandObj.args.join(", ")}`,
+	// );
+
+	const proc = spawn(commandObj.command, commandObj.args, {
+		stdio: ["inherit", "pipe", "pipe"],
+	});
+
+	proc.stdout.on("data", (chunk: Buffer | string) => {
+		stdout.write(chunk);
+	});
+	proc.stdout.on("end", () => {
+		if (stdout !== process.stdout) stdout.end();
+	});
+
+	proc.stderr.on("data", (chunk: Buffer | string) => {
+		stderr.write(chunk);
+	});
+	proc.stderr.on("end", () => {
+		if (stderr !== process.stderr) stderr.end();
+	});
+
+	proc.on("close", () => {
+		// console.log(`command ${commandObj.command} closed`);
+		runNextOrEnd(commandObj.nextCommand, stdout, stderr);
+	});
 }
 
 function handleStreamRedirect(args: string[]): {
