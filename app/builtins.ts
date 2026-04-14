@@ -16,6 +16,12 @@ export type ShellState = {
 	history: string[];
 	lastAppendedIdx: number;
 	exitRequested: boolean;
+	backgroundJobs: {
+		seq: number;
+		pid: number;
+		status: "Running" | "Done";
+		commandStr: string;
+	}[];
 	backgroundJobSeq: number;
 };
 
@@ -100,6 +106,11 @@ export function runBuiltin(
 		}
 
 		case "jobs": {
+			const job = shellState.backgroundJobs[0];
+			if (!job) return;
+			stdout.write(
+				`[${job.seq}]+  ${job.status.padEnd(24)}${job.commandStr}\n`,
+			);
 			return;
 		}
 

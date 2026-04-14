@@ -17,6 +17,7 @@ const shellState: ShellState = {
 	history: [],
 	lastAppendedIdx: 0,
 	exitRequested: false,
+	backgroundJobs: [],
 	backgroundJobSeq: 1,
 };
 
@@ -101,9 +102,34 @@ async function run(
 	stdout: NodeJS.WritableStream,
 	stderr: NodeJS.WritableStream,
 ): Promise<number> {
-	const runInBackground = shouldRunInBackground(args, nextCommand);
+	if (shouldRunInBackground(args, nextCommand)) {
+		const currentBackgroundJobSeq = shellState.backgroundJobSeq;
+		const pid = runBackgroundProcess(
+			{ command, args, nextCommand },
+			() => {
+				const job = shellState.backgroundJobs.find(
+					(bg) => bg.seq === currentBackgroundJobSeq,
+				);
+				if (!job) return;
+				job.status = "Done";
+			},
+			stdout,
+			stderr,
+			stdin,
+		);
+		stdout.write(`[${shellState.backgroundJobSeq}] ${pid}\n`);
 
-	if (isBuiltin(command) && !runInBackground) {
+		shellState.backgroundJobs.push({
+			seq: shellState.backgroundJobSeq,
+			pid: pid!,
+			status: "Running",
+			commandStr: buildCommandStr({ command, args, nextCommand }),
+		});
+		shellState.backgroundJobSeq += 1;
+		return 0;
+	}
+
+	if (isBuiltin(command)) {
 		runBuiltin(command, args, {
 			stdout,
 			stderr,
@@ -120,18 +146,6 @@ async function run(
 		// console.log(
 		// 	`Original: command: ${command}; args: ${args.join(", ")}; nextCommand: ${JSON.stringify(nextCommand)}`,
 		// );
-		if (runInBackground) {
-			const pid = runBackgroundProcess(
-				{ command, args, nextCommand },
-				stdout,
-				stderr,
-				stdin,
-			);
-			stdout.write(`[${shellState.backgroundJobSeq}] ${pid}\n`);
-
-			shellState.backgroundJobSeq += 1;
-			return 0;
-		}
 
 		const proc = spawn(command, args, {
 			stdio: [stdin ? "pipe" : "inherit", "pipe", "pipe"],
@@ -179,11 +193,15 @@ function shouldRunInBackground(
 
 function runBackgroundProcess(
 	commandObj: CommandObj | undefined,
+	finalCallback: () => void,
 	stdout: NodeJS.WritableStream,
 	stderr: NodeJS.WritableStream,
 	stdin?: NodeJS.ReadableStream,
 ): number | undefined {
-	if (!commandObj) return;
+	if (!commandObj) {
+		finalCallback();
+		return;
+	}
 	// console.log(
 	// 	`Next: command: ${commandObj.command}; args: ${commandObj.args.join(", ")}`,
 	// );
@@ -212,10 +230,24 @@ function runBackgroundProcess(
 
 	proc.on("close", () => {
 		// console.log(`command ${commandObj.command} closed`);
-		runBackgroundProcess(commandObj.nextCommand, stdout, stderr);
+		runBackgroundProcess(commandObj.nextCommand, finalCallback, stdout, stderr);
 	});
 
 	return proc.pid;
+}
+
+function buildCommandStr(commandObj: CommandObj): string {
+	let commandStr = "";
+
+	let currentCommand: CommandObj | undefined = commandObj;
+	let nextCommand = commandObj.nextCommand;
+	do {
+		commandStr += `${currentCommand.command} ${currentCommand.args.join(" ")} ${nextCommand ? "&& " : ""}`;
+
+		currentCommand = nextCommand;
+		nextCommand = currentCommand?.nextCommand;
+	} while (currentCommand);
+	return commandStr;
 }
 
 function handleStreamRedirect(args: string[]): {
