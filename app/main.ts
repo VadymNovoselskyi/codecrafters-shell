@@ -112,6 +112,19 @@ async function run(
 				);
 				if (!job) return;
 				job.status = "Done";
+
+				let marker = " ";
+				if (currentBackgroundJobSeq === shellState.backgroundJobs.length - 1) {
+					marker = "-";
+				} else if (
+					currentBackgroundJobSeq === shellState.backgroundJobs.length
+				) {
+					marker = "+";
+				}
+
+				stdout.write(
+					`[${job.seq}]${marker}  ${job.status.padEnd(24)}${job.commandStr}\n`,
+				);
 			},
 			stdout,
 			stderr,
