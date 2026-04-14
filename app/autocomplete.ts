@@ -6,6 +6,7 @@ import { parseInput } from "./parse";
 export type AutocompleteUi = {
 	write: (text: string) => void;
 	redraw: (line: string) => void;
+	redrawAndWrite: (lineToDraw: string, text: string) => void;
 };
 
 export function handleAutocomplete(
@@ -104,11 +105,15 @@ function handleFilepathAutocomplete(
 		return [[filename + longestPrefix], filename];
 	}
 
-	// ui.redraw();
-	ui.write(
+	ui.redrawAndWrite(
+		line,
 		"\n" + fileHits.map((file) => fileToString(file, cwd)).join("  ") + "\n",
 	);
-	ui.redraw(line);
+	// ui.redraw(line);
+	// ui.write(
+	// 	"\n" + fileHits.map((file) => fileToString(file, cwd)).join("  ") + "\n",
+	// );
+	// ui.redraw();
 	return [[], line];
 }
 
