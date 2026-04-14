@@ -33,12 +33,6 @@ const rl = createInterface({
 				rl.prompt();
 				rl.write(lineToDraw);
 			},
-			redrawAndWrite: (lineToDraw: string, text: string) => {
-				rl.write(null, { ctrl: true, name: "u" });
-				rl.prompt();
-				rl.write(lineToDraw);
-				fs.writeSync(1, "\x1b7" + text + "\x1b8");
-			},
 		}),
 });
 rl.prompt();

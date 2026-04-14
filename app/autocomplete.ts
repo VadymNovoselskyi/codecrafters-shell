@@ -3,10 +3,11 @@ import path from "path";
 import { BUILTINS } from "./builtins";
 import { parseInput } from "./parse";
 
+let filepathTabState: { line: string; count: number } | null = null;
+
 export type AutocompleteUi = {
 	write: (text: string) => void;
 	redraw: (line: string) => void;
-	redrawAndWrite: (lineToDraw: string, text: string) => void;
 };
 
 export function handleAutocomplete(
@@ -86,9 +87,11 @@ function handleFilepathAutocomplete(
 		: files;
 
 	if (!fileHits.length) {
+		filepathTabState = null;
 		ui.write("\x07");
 		return [[], line];
 	} else if (fileHits.length === 1) {
+		filepathTabState = null;
 		return [
 			[
 				fileHits[0].concat(
@@ -99,21 +102,26 @@ function handleFilepathAutocomplete(
 		];
 	}
 
-	ui.write("\x07");
 	const longestPrefix = getLongestPrefix(filename, fileHits);
 	if (longestPrefix) {
+		filepathTabState = null;
 		return [[filename + longestPrefix], filename];
 	}
 
-	ui.redrawAndWrite(
-		line,
+	if (!filepathTabState || filepathTabState.line !== line) {
+		filepathTabState = { line, count: 0 };
+	}
+	filepathTabState.count++;
+	if (filepathTabState.count % 2 === 1) {
+		ui.write("\x07");
+		return [[], line];
+	}
+	filepathTabState = null;
+
+	ui.write(
 		"\n" + fileHits.map((file) => fileToString(file, cwd)).join("  ") + "\n",
 	);
-	// ui.redraw(line);
-	// ui.write(
-	// 	"\n" + fileHits.map((file) => fileToString(file, cwd)).join("  ") + "\n",
-	// );
-	// ui.redraw();
+	ui.redraw(line);
 	return [[], line];
 }
 
