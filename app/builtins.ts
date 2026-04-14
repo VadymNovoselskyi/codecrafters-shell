@@ -106,11 +106,16 @@ export function runBuiltin(
 		}
 
 		case "jobs": {
-			const job = shellState.backgroundJobs[0];
-			if (!job) return;
-			stdout.write(
-				`[${job.seq}]+  ${job.status.padEnd(24)}${job.commandStr}\n`,
-			);
+			for (let i = 0; i < shellState.backgroundJobs.length; i++) {
+				const job = shellState.backgroundJobs[i];
+				let marker = " ";
+				if (i === shellState.backgroundJobs.length - 2) marker = "-";
+				else if (i === shellState.backgroundJobs.length - 1) marker = "+";
+
+				stdout.write(
+					`[${job.seq}]${marker}  ${job.status.padEnd(24)}${job.commandStr}\n`,
+				);
+			}
 			return;
 		}
 
