@@ -17,6 +17,7 @@ const shellState: ShellState = {
 	history: [],
 	lastAppendedIdx: 0,
 	exitRequested: false,
+	backgroundJobSeq: 1,
 };
 
 loadHistoryFromFile(shellState, process.env.HISTFILE);
@@ -97,7 +98,13 @@ async function run(
 	stdout: NodeJS.WritableStream,
 	stderr: NodeJS.WritableStream,
 ): Promise<number> {
-	if (isBuiltin(command)) {
+	let runInBackground = false;
+	if (args[args.length - 1] === "&") {
+		args.pop();
+		runInBackground = true;
+	}
+
+	if (isBuiltin(command) && !runInBackground) {
 		runBuiltin(command, args, {
 			stdout,
 			stderr,
@@ -114,6 +121,14 @@ async function run(
 		const proc = spawn(command, args, {
 			stdio: [stdin ? "pipe" : "inherit", "pipe", "pipe"],
 		});
+
+		if (runInBackground) {
+			stdout.write(`[${shellState.backgroundJobSeq}] ${proc.pid}\n`);
+			if (stdout !== process.stdout) stdout.end();
+
+			shellState.backgroundJobSeq += 1;
+			return 0;
+		}
 
 		if (stdin) stdin.pipe(proc.stdin!);
 

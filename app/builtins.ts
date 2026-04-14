@@ -16,6 +16,7 @@ export type ShellState = {
 	history: string[];
 	lastAppendedIdx: number;
 	exitRequested: boolean;
+	backgroundJobSeq: number;
 };
 
 export type BuiltinContext = {
