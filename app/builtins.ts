@@ -144,6 +144,28 @@ export function runBuiltin(
 	}
 }
 
+export function printDoneJobs(
+	shellState: ShellState,
+	stdout: NodeJS.WritableStream,
+) {
+	for (let i = 0; i < shellState.backgroundJobs.length; i++) {
+		const job = shellState.backgroundJobs[i];
+		if (job.status !== "Done") continue;
+
+		let marker = " ";
+		if (i === shellState.backgroundJobs.length - 2) marker = "-";
+		else if (i === shellState.backgroundJobs.length - 1) marker = "+";
+
+		stdout.write(
+			`[${job.seq}]${marker}  ${job.status.padEnd(24)}${job.commandStr}\n`,
+		);
+	}
+	shellState.backgroundJobs = shellState.backgroundJobs.filter(
+		(job) => job.status === "Running",
+	);
+	return;
+}
+
 export function loadHistoryFromFile(
 	shellState: ShellState,
 	historyFile: string | undefined,

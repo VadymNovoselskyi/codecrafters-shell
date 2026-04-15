@@ -6,6 +6,7 @@ import {
 	isBuiltin,
 	loadHistoryFromFile,
 	persistHistoryToFile,
+	printDoneJobs,
 	runBuiltin,
 	type ShellState,
 } from "./builtins";
@@ -86,6 +87,7 @@ rl.on("line", async (input) => {
 		return;
 	}
 
+	printDoneJobs(shellState, process.stdout);
 	rl.prompt();
 });
 
