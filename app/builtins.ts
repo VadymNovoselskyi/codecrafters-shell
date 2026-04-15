@@ -22,7 +22,6 @@ export type ShellState = {
 		status: "Running" | "Done";
 		commandStr: string;
 	}[];
-	backgroundJobSeq: number;
 };
 
 export type BuiltinContext = {
@@ -164,6 +163,13 @@ export function printDoneJobs(
 		(job) => job.status === "Running",
 	);
 	return;
+}
+
+export function findOpenJobSeq(backgroundJobs: ShellState["backgroundJobs"]) {
+	for (let i = 1; i <= backgroundJobs.length; i++) {
+		if (backgroundJobs[i - 1].seq !== i) return i;
+	}
+	return backgroundJobs.length + 1;
 }
 
 export function loadHistoryFromFile(

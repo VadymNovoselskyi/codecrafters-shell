@@ -1,8 +1,9 @@
 import fs from "fs";
 import path from "path";
-import { ChildProcess, spawn } from "child_process";
+import { spawn } from "child_process";
 import { PassThrough } from "stream";
 import {
+	findOpenJobSeq,
 	isBuiltin,
 	loadHistoryFromFile,
 	persistHistoryToFile,
@@ -19,7 +20,6 @@ const shellState: ShellState = {
 	lastAppendedIdx: 0,
 	exitRequested: false,
 	backgroundJobs: [],
-	backgroundJobSeq: 1,
 };
 
 loadHistoryFromFile(shellState, process.env.HISTFILE);
@@ -105,7 +105,7 @@ async function run(
 	stderr: NodeJS.WritableStream,
 ): Promise<number> {
 	if (shouldRunInBackground(args, nextCommand)) {
-		const currentBackgroundJobSeq = shellState.backgroundJobSeq;
+		let currentBackgroundJobSeq = findOpenJobSeq(shellState.backgroundJobs);
 		const pid = runBackgroundProcess(
 			{ command, args, nextCommand },
 			() => {
@@ -119,15 +119,15 @@ async function run(
 			stderr,
 			stdin,
 		);
-		stdout.write(`[${shellState.backgroundJobSeq}] ${pid}\n`);
+		stdout.write(`[${currentBackgroundJobSeq}] ${pid}\n`);
 
 		shellState.backgroundJobs.push({
-			seq: shellState.backgroundJobSeq,
+			seq: currentBackgroundJobSeq,
 			pid: pid!,
 			status: "Running",
 			commandStr: buildCommandStr({ command, args, nextCommand }),
 		});
-		shellState.backgroundJobSeq += 1;
+		shellState.backgroundJobs.sort((a, b) => a.seq - b.seq);
 		return 0;
 	}
 
