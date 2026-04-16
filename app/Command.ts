@@ -1,7 +1,7 @@
 import { spawn } from "child_process";
 import { isBuiltin, runBuiltin } from "./builtins";
 import { ShellState } from "./ShellState";
-import { getExecPath } from "./helpers";
+import { getExecPath } from "./pathHelpers";
 
 export class Command {
 	executable: string;
@@ -14,12 +14,23 @@ export class Command {
 		this.nextCommand = nextCommand;
 	}
 
+	getLastCommand(): Command {
+		let command: Command = this;
+		while (command.nextCommand) {
+			command = command.nextCommand;
+		}
+		return command;
+	}
+
 	async run(
 		shellState: ShellState,
-		stdin: NodeJS.ReadableStream | undefined,
-		stdout: NodeJS.WritableStream,
-		stderr: NodeJS.WritableStream,
+		streams: {
+			stdin?: NodeJS.ReadableStream;
+			stdout: NodeJS.WritableStream;
+			stderr: NodeJS.WritableStream;
+		},
 	): Promise<number> {
+		const { stdin, stdout, stderr } = streams;
 		if (this.shouldRunInBackground()) {
 			let currentBackgroundJobSeq = shellState.bgJobs.getNextSeq();
 			const pid = this.runBackgroundProcess(
@@ -29,9 +40,7 @@ export class Command {
 					if (!job) return;
 					job.status = "Done";
 				},
-				stdout,
-				stderr,
-				stdin,
+				{ stdin, stdout, stderr },
 			);
 			stdout.write(`[${currentBackgroundJobSeq}] ${pid}\n`);
 
@@ -44,41 +53,39 @@ export class Command {
 			return 0;
 		}
 
-		if (isBuiltin(this.executable)) {
-			runBuiltin(this.executable, this.args, {
-				shellState,
-				stdout,
-				stderr,
-			});
+		let command: Command | undefined = this;
+		let result = 0;
+		while (command && result === 0) {
+			if (isBuiltin(command.executable)) {
+				result = runBuiltin(command.executable, command.args, {
+					shellState,
+					stdout,
+					stderr,
+				});
+			} else if (getExecPath(command.executable)) {
+				const proc = spawn(command.executable, command.args, {
+					stdio: [stdin ? "pipe" : "inherit", "pipe", "pipe"],
+				});
+				if (stdin) stdin.pipe(proc.stdin!);
 
-			if (stdout !== process.stdout) stdout.end();
-			if (stderr !== process.stderr) stderr.end();
-			return 0;
+				if (proc.stdout) proc.stdout.pipe(stdout, { end: false });
+				if (proc.stderr) proc.stderr.pipe(stderr, { end: false });
+
+				const code = await new Promise<number>((resolve) => {
+					proc.on("close", (code) => resolve(code ?? 0));
+					proc.on("error", () => resolve(1));
+				});
+				result = code;
+			} else {
+				stderr.write(`${command.executable}: command not found\n`);
+				result = 127;
+			}
+			command = command.nextCommand;
 		}
 
-		if (getExecPath(this.executable)) {
-			const proc = spawn(this.executable, this.args, {
-				stdio: [stdin ? "pipe" : "inherit", "pipe", "pipe"],
-			});
-			if (stdin) stdin.pipe(proc.stdin!);
-
-			if (proc.stdout) {
-				proc.stdout.pipe(stdout, { end: stdout !== process.stdout });
-			}
-			if (proc.stderr) {
-				proc.stderr.pipe(stderr, { end: stderr !== process.stderr });
-			}
-
-			return await new Promise<number>((resolve) => {
-				proc.on("close", (code) => resolve(code ?? 0));
-				proc.on("error", () => resolve(1));
-			});
-		}
-
-		stderr.write(`${this.executable}: command not found\n`);
 		if (stdout !== process.stdout) stdout.end();
 		if (stderr !== process.stderr) stderr.end();
-		return 127;
+		return result;
 	}
 
 	private shouldRunInBackground(): boolean {
@@ -100,10 +107,13 @@ export class Command {
 	private runBackgroundProcess(
 		command: Command | undefined,
 		finalCallback: () => void,
-		stdout: NodeJS.WritableStream,
-		stderr: NodeJS.WritableStream,
-		stdin?: NodeJS.ReadableStream,
+		streams: {
+			stdin?: NodeJS.ReadableStream;
+			stdout: NodeJS.WritableStream;
+			stderr: NodeJS.WritableStream;
+		},
 	): number | undefined {
+		const { stdin, stdout, stderr } = streams;
 		if (!command) {
 			finalCallback();
 			return;
@@ -119,7 +129,7 @@ export class Command {
 				stdout.write(chunk);
 			});
 			proc.stdout.on("end", () => {
-				if (stdout !== process.stdout) stdout.end();
+				if (stdout !== process.stdout && !command.nextCommand) stdout.end();
 			});
 		}
 		if (proc.stderr) {
@@ -127,17 +137,16 @@ export class Command {
 				stderr.write(chunk);
 			});
 			proc.stderr.on("end", () => {
-				if (stderr !== process.stderr) stderr.end();
+				if (stderr !== process.stderr && !command.nextCommand) stderr.end();
 			});
 		}
 
 		proc.on("close", () => {
-			this.runBackgroundProcess(
-				command.nextCommand,
-				finalCallback,
+			this.runBackgroundProcess(command.nextCommand, finalCallback, {
+				stdin,
 				stdout,
 				stderr,
-			);
+			});
 		});
 
 		return proc.pid;

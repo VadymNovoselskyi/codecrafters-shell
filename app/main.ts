@@ -44,7 +44,13 @@ rl.on("line", async (input) => {
 		const stdoutTarget = redirectedStdout ?? nextPipe ?? process.stdout;
 		const stderrTarget = redirectedStderr ?? process.stderr;
 
-		runs.push(command.run(shellState, upstream, stdoutTarget, stderrTarget));
+		runs.push(
+			command.run(shellState, {
+				stdin: upstream,
+				stdout: stdoutTarget,
+				stderr: stderrTarget,
+			}),
+		);
 
 		if (shellState.exitRequested) {
 			break;

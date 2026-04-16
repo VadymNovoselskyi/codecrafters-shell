@@ -1,6 +1,6 @@
 import fs from "fs";
 import type { ShellState } from "./ShellState";
-import { getExecPath } from "./helpers";
+import { getExecPath } from "./pathHelpers";
 
 export const BUILTINS = [
 	"cd",
@@ -28,7 +28,7 @@ export function runBuiltin(
 	command: BuiltinName,
 	args: string[],
 	context: BuiltinContext,
-): void {
+): number {
 	const { shellState, stdout, stderr } = context;
 
 	switch (command) {
@@ -42,18 +42,19 @@ export function runBuiltin(
 				process.chdir(targetPath);
 			} else {
 				stderr.write(`cd: ${targetPath}: No such file or directory\n`);
+				return 1;
 			}
-			return;
+			return 0;
 		}
 
 		case "pwd": {
 			stdout.write(process.cwd() + "\n");
-			return;
+			return 0;
 		}
 
 		case "echo": {
 			stdout.write(args.join(" ") + "\n");
-			return;
+			return 0;
 		}
 
 		case "history": {
@@ -64,8 +65,9 @@ export function runBuiltin(
 					shellState.history.load(filepath);
 				} catch (error) {
 					stderr.write(`Error reading file: ${error}\n`);
+					return 1;
 				}
-				return;
+				return 0;
 			}
 
 			if (mode === "-w" || mode === "-a") {
@@ -74,8 +76,9 @@ export function runBuiltin(
 					shellState.history.persist(filepath, mode === "-w" ? "w" : "a");
 				} catch (error) {
 					stderr.write(`Error writing file: ${error}\n`);
+					return 1;
 				}
-				return;
+				return 0;
 			}
 
 			const history = shellState.history.getHistory(Number(args[0]));
@@ -83,18 +86,18 @@ export function runBuiltin(
 			for (let i = 0; i < history.length; i++) {
 				stdout.write(`    ${i + offset + 1}  ${history[i]}\n`);
 			}
-			return;
+			return 0;
 		}
 
 		case "jobs": {
 			shellState.bgJobs.printJobs(stdout);
 			shellState.bgJobs.filterRunning();
-			return;
+			return 0;
 		}
 
 		case "exit": {
 			shellState.exitRequested = true;
-			return;
+			return 0;
 		}
 
 		case "type": {
@@ -107,9 +110,11 @@ export function runBuiltin(
 					stdout.write(`${searchedCommand} is ${execPath}\n`);
 				} else {
 					stderr.write(`${searchedCommand}: not found\n`);
+					return 1;
 				}
 			}
-			return;
+			return 0;
 		}
 	}
+	return 1;
 }

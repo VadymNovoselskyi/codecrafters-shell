@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { BUILTINS } from "./builtins";
 import { parseInput } from "./parse";
+import { getPathExecs } from "./pathHelpers";
 
 let filepathTabState: { line: string; count: number } | null = null;
 
@@ -15,17 +16,13 @@ export function handleAutocomplete(
 	ui: AutocompleteUi,
 ): [string[], string] {
 	const pipes = parseInput(line);
-	let { executable: command, args, nextCommand } = pipes[pipes.length - 1];
-	while (nextCommand) {
-		command = nextCommand.executable;
-		args = nextCommand.args;
-		nextCommand = nextCommand.nextCommand;
-	}
+	let { executable, args } = pipes[pipes.length - 1].getLastCommand();
 
 	if (!args.length && !line.endsWith(" ")) {
-		return handleCommandAutocomplete(command, ui);
+		return handleCommandAutocomplete(executable, ui);
+	} else {
+		return handleFilepathAutocomplete(line, args, ui);
 	}
-	return handleFilepathAutocomplete(line, args, ui);
 }
 
 function handleCommandAutocomplete(
@@ -134,30 +131,6 @@ function fileToString(filename: string, cwd: string): string {
 	return filename.concat(
 		fs.lstatSync(`${cwd}/${filename}`).isDirectory() ? "/" : "",
 	);
-}
-
-function getPathExecs(): string[] {
-	const results: string[] = [];
-	const paths = process.env.PATH?.split(path.delimiter);
-	if (!paths) {
-		return [];
-	}
-
-	for (const pathEntry of paths) {
-		if (!fs.existsSync(pathEntry)) continue;
-
-		const executables = fs.readdirSync(pathEntry);
-		for (const executable of executables) {
-			try {
-				fs.accessSync(`${pathEntry}/${executable}`, fs.constants.X_OK);
-				if (!results.includes(executable)) results.push(executable);
-			} catch {
-				continue;
-			}
-		}
-	}
-
-	return results;
 }
 
 function getLongestPrefix(start: string, candidates: string[]): string {
