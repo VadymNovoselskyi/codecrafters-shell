@@ -5,24 +5,17 @@ import { PassThrough } from "stream";
 import {
 	findOpenJobSeq,
 	isBuiltin,
-	loadHistoryFromFile,
-	persistHistoryToFile,
 	printDoneJobs,
 	runBuiltin,
-	type ShellState,
 } from "./builtins";
 import { handleAutocomplete } from "./autocomplete";
 import { parseInput, type CommandObj } from "./parse";
 import { createInterface } from "readline";
+import { ShellState } from "./ShellState";
 
-const shellState: ShellState = {
-	history: [],
-	lastAppendedIdx: 0,
-	exitRequested: false,
-	backgroundJobs: [],
-};
+const shellState = new ShellState();
 
-loadHistoryFromFile(shellState, process.env.HISTFILE);
+shellState.history.load(process.env.HISTFILE);
 
 const rl = createInterface({
 	input: process.stdin,
@@ -92,7 +85,7 @@ rl.on("line", async (input) => {
 });
 
 rl.on("close", () => {
-	persistHistoryToFile(shellState, process.env.HISTFILE);
+	shellState.history.persist(process.env.HISTFILE);
 	process.exit(0);
 });
 

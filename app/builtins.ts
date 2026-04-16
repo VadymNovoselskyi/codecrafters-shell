@@ -1,4 +1,5 @@
 import fs from "fs";
+import type { ShellState } from "./ShellState";
 
 export const BUILTINS = [
 	"cd",
@@ -11,18 +12,6 @@ export const BUILTINS = [
 ] as const;
 
 type BuiltinName = (typeof BUILTINS)[number];
-
-export type ShellState = {
-	history: string[];
-	lastAppendedIdx: number;
-	exitRequested: boolean;
-	backgroundJobs: {
-		seq: number;
-		pid: number;
-		status: "Running" | "Done";
-		commandStr: string;
-	}[];
-};
 
 export type BuiltinContext = {
 	stdout: NodeJS.WritableStream;
@@ -72,8 +61,7 @@ export function runBuiltin(
 			if (mode === "-r") {
 				const filepath = args[1];
 				try {
-					const data = fs.readFileSync(filepath, "utf-8");
-					shellState.history.push(...data.split("\n").filter(Boolean));
+					shellState.history.load(filepath);
 				} catch (error) {
 					stderr.write(`Error reading file: ${error}\n`);
 				}
@@ -82,24 +70,18 @@ export function runBuiltin(
 
 			if (mode === "-w" || mode === "-a") {
 				const filepath = args[1];
-				fs.writeFileSync(
-					filepath,
-					shellState.history.slice(shellState.lastAppendedIdx).join("\n") +
-						"\n",
-					{ flag: mode === "-w" ? "w+" : "a+" },
-				);
-				shellState.lastAppendedIdx = shellState.history.length;
+				try {
+					shellState.history.persist(filepath, mode === "-w" ? "w" : "a");
+				} catch (error) {
+					stderr.write(`Error writing file: ${error}\n`);
+				}
 				return;
 			}
 
-			const requestedAmount = Number(args[0] || shellState.history.length);
-			const amount = Math.min(shellState.history.length, requestedAmount);
-			for (
-				let i = shellState.history.length - amount;
-				i < shellState.history.length;
-				i++
-			) {
-				stdout.write(`    ${i + 1}  ${shellState.history[i]}\n`);
+			const history = shellState.history.getHistory(Number(args[0]));
+			const offset = shellState.history.length - history.length;
+			for (let i = 0; i < history.length; i++) {
+				stdout.write(`    ${i + offset + 1}  ${history[i]}\n`);
 			}
 			return;
 		}
@@ -170,29 +152,4 @@ export function findOpenJobSeq(backgroundJobs: ShellState["backgroundJobs"]) {
 		if (backgroundJobs[i - 1].seq !== i) return i;
 	}
 	return backgroundJobs.length + 1;
-}
-
-export function loadHistoryFromFile(
-	shellState: ShellState,
-	historyFile: string | undefined,
-): void {
-	if (!historyFile) return;
-
-	try {
-		const data = fs.readFileSync(historyFile, "utf-8");
-		shellState.history.push(...data.split("\n").filter(Boolean));
-	} catch {}
-}
-
-export function persistHistoryToFile(
-	shellState: ShellState,
-	historyFile: string | undefined,
-): void {
-	if (!historyFile) return;
-
-	fs.writeFileSync(
-		historyFile,
-		shellState.history.slice(shellState.lastAppendedIdx).join("\n") + "\n",
-		{ flag: "w+" },
-	);
 }
