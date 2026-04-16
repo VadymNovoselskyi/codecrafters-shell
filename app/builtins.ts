@@ -87,19 +87,8 @@ export function runBuiltin(
 		}
 
 		case "jobs": {
-			for (let i = 0; i < shellState.backgroundJobs.length; i++) {
-				const job = shellState.backgroundJobs[i];
-				let marker = " ";
-				if (i === shellState.backgroundJobs.length - 2) marker = "-";
-				else if (i === shellState.backgroundJobs.length - 1) marker = "+";
-
-				stdout.write(
-					`[${job.seq}]${marker}  ${job.status.padEnd(24)}${job.commandStr}\n`,
-				);
-			}
-			shellState.backgroundJobs = shellState.backgroundJobs.filter(
-				(job) => job.status === "Running",
-			);
+			shellState.bgJobs.printJobs(stdout);
+			shellState.bgJobs.filterRunning();
 			return;
 		}
 
@@ -123,33 +112,4 @@ export function runBuiltin(
 			return;
 		}
 	}
-}
-
-export function printDoneJobs(
-	shellState: ShellState,
-	stdout: NodeJS.WritableStream,
-) {
-	for (let i = 0; i < shellState.backgroundJobs.length; i++) {
-		const job = shellState.backgroundJobs[i];
-		if (job.status !== "Done") continue;
-
-		let marker = " ";
-		if (i === shellState.backgroundJobs.length - 2) marker = "-";
-		else if (i === shellState.backgroundJobs.length - 1) marker = "+";
-
-		stdout.write(
-			`[${job.seq}]${marker}  ${job.status.padEnd(24)}${job.commandStr}\n`,
-		);
-	}
-	shellState.backgroundJobs = shellState.backgroundJobs.filter(
-		(job) => job.status === "Running",
-	);
-	return;
-}
-
-export function findOpenJobSeq(backgroundJobs: ShellState["backgroundJobs"]) {
-	for (let i = 1; i <= backgroundJobs.length; i++) {
-		if (backgroundJobs[i - 1].seq !== i) return i;
-	}
-	return backgroundJobs.length + 1;
 }

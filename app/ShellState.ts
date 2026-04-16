@@ -1,18 +1,14 @@
+import { BackgroundJobsState } from "./BackgroundJobsState";
 import { HistoryState } from "./HistoryState";
 
 export class ShellState {
 	history: HistoryState;
-	backgroundJobs: {
-		seq: number;
-		pid: number;
-		status: "Running" | "Done";
-		commandStr: string;
-	}[];
+	bgJobs: BackgroundJobsState;
 	exitRequested: boolean;
 
 	constructor() {
 		this.history = new HistoryState();
-		this.backgroundJobs = [];
+		this.bgJobs = new BackgroundJobsState();
 		this.exitRequested = false;
 	}
 }

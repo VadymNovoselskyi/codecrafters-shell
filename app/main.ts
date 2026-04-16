@@ -2,12 +2,7 @@ import fs from "fs";
 import path from "path";
 import { spawn } from "child_process";
 import { PassThrough } from "stream";
-import {
-	findOpenJobSeq,
-	isBuiltin,
-	printDoneJobs,
-	runBuiltin,
-} from "./builtins";
+import { isBuiltin, runBuiltin } from "./builtins";
 import { handleAutocomplete } from "./autocomplete";
 import { parseInput, type CommandObj } from "./parse";
 import { createInterface } from "readline";
@@ -80,7 +75,8 @@ rl.on("line", async (input) => {
 		return;
 	}
 
-	printDoneJobs(shellState, process.stdout);
+	shellState.bgJobs.printDoneJobs(process.stdout);
+	shellState.bgJobs.filterRunning();
 	rl.prompt();
 });
 
@@ -98,13 +94,11 @@ async function run(
 	stderr: NodeJS.WritableStream,
 ): Promise<number> {
 	if (shouldRunInBackground(args, nextCommand)) {
-		let currentBackgroundJobSeq = findOpenJobSeq(shellState.backgroundJobs);
+		let currentBackgroundJobSeq = shellState.bgJobs.getNextSeq();
 		const pid = runBackgroundProcess(
 			{ command, args, nextCommand },
 			() => {
-				const job = shellState.backgroundJobs.find(
-					(bg) => bg.seq === currentBackgroundJobSeq,
-				);
+				const job = shellState.bgJobs.getBySeq(currentBackgroundJobSeq);
 				if (!job) return;
 				job.status = "Done";
 			},
@@ -114,13 +108,12 @@ async function run(
 		);
 		stdout.write(`[${currentBackgroundJobSeq}] ${pid}\n`);
 
-		shellState.backgroundJobs.push({
+		shellState.bgJobs.push({
 			seq: currentBackgroundJobSeq,
 			pid: pid!,
 			status: "Running",
 			commandStr: buildCommandStr({ command, args, nextCommand }),
 		});
-		shellState.backgroundJobs.sort((a, b) => a.seq - b.seq);
 		return 0;
 	}
 
@@ -138,10 +131,6 @@ async function run(
 	}
 
 	if (findExecPath(command)) {
-		// console.log(
-		// 	`Original: command: ${command}; args: ${args.join(", ")}; nextCommand: ${JSON.stringify(nextCommand)}`,
-		// );
-
 		const proc = spawn(command, args, {
 			stdio: [stdin ? "pipe" : "inherit", "pipe", "pipe"],
 		});
