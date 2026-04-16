@@ -52,9 +52,7 @@ rl.on("line", async (input) => {
 			}),
 		);
 
-		if (shellState.exitRequested) {
-			break;
-		}
+		if (shellState.exitRequested) break;
 
 		if (!isLastStage) {
 			if (nextPipe) {

@@ -7,11 +7,18 @@ export class Command {
 	executable: string;
 	args: string[];
 	nextCommand?: Command;
+	nextCommandCondition?: "&&" | "||" | ";";
 
-	constructor(command: string, args: string[], nextCommand?: Command) {
+	constructor(
+		command: string,
+		args: string[],
+		nextCommand?: Command,
+		nextCommandCondition?: "&&" | "||" | ";",
+	) {
 		this.executable = command;
 		this.args = args;
 		this.nextCommand = nextCommand;
+		this.nextCommandCondition = nextCommandCondition;
 	}
 
 	getLastCommand(): Command {
@@ -55,7 +62,12 @@ export class Command {
 
 		let command: Command | undefined = this;
 		let result = 0;
-		while (command && result === 0) {
+		let condition: "&&" | "||" | ";" | undefined = undefined;
+		while (
+			command &&
+			!(result !== 0 && condition === "&&") &&
+			!(result === 0 && condition === "||")
+		) {
 			if (isBuiltin(command.executable)) {
 				result = runBuiltin(command.executable, command.args, {
 					shellState,
@@ -80,6 +92,7 @@ export class Command {
 				stderr.write(`${command.executable}: command not found\n`);
 				result = 127;
 			}
+			condition = command?.nextCommandCondition;
 			command = command.nextCommand;
 		}
 
@@ -141,7 +154,16 @@ export class Command {
 			});
 		}
 
-		proc.on("close", () => {
+		proc.on("close", (code) => {
+			if (code !== 0 && command.nextCommandCondition === "&&") {
+				finalCallback();
+				return;
+			}
+			if (code === 0 && command.nextCommandCondition === "||") {
+				finalCallback();
+				return;
+			}
+
 			this.runBackgroundProcess(command.nextCommand, finalCallback, {
 				stdin,
 				stdout,
@@ -158,8 +180,7 @@ export class Command {
 		let currentCommand: Command | undefined = this;
 		let nextCommand = this.nextCommand;
 		do {
-			commandStr += `${currentCommand.executable} ${currentCommand.args.join(" ")} ${nextCommand ? "&& " : ""}`;
-
+			commandStr += `${currentCommand.executable} ${currentCommand.args.join(" ")} ${currentCommand.nextCommandCondition ? ` ${currentCommand.nextCommandCondition} ` : ""}`;
 			currentCommand = nextCommand;
 			nextCommand = currentCommand?.nextCommand;
 		} while (currentCommand);

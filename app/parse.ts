@@ -4,19 +4,26 @@ import { Command } from "./Command";
 export function parseInput(input: string): Command[] {
 	const results: Command[] = [];
 
-	for (const pipe of input.split(" | ")) {
+	// Split on | only when it is not part of || (list OR) (chat GPT)
+	for (const pipe of input.split(/\s*(?<!\|)\|(?!\|)\s*/)) {
 		let prevCommand: Command | null = null;
 
-		for (const commandObj of pipe.split(" && ")) {
+		// Split on whitespace followed by &&, ||, or ;
+		const commandObjs = pipe.split(/\s*(&&|\|\||;)\s*/);
+		for (let i = 0; i < commandObjs.length; i += 2) {
+			const commandObj = commandObjs[i];
+			const nextCommandCondition = commandObjs[i + 1] as "&&" | "||" | ";";
 			let command: string;
 			let argsUnparsed: string[];
 
 			if (commandObj.startsWith("'") || commandObj.startsWith('"')) {
+				// Extract the quoted string
 				const match = commandObj.match(/'([^']+)'|"([^"]+)"/);
 				if (!match?.[1] && !match?.[2]) {
-					throw Error(`Error parsing input (smth witn quotes): ${commandObj}`);
+					throw Error(`Error parsing input (smth witin quotes): ${commandObj}`);
 				}
 
+				// Remove backslashes from the quoted string
 				command = (match[1] ?? match[2]).replace(/\\(.)/g, "$1");
 				argsUnparsed = commandObj.substring(command.length + 3).split(" ");
 			} else {
@@ -25,7 +32,12 @@ export function parseInput(input: string): Command[] {
 
 			const args = normalizeArgs(argsUnparsed.join(" "));
 
-			const commandResult = new Command(command, args);
+			const commandResult = new Command(
+				command,
+				args,
+				undefined,
+				nextCommandCondition,
+			);
 			if (prevCommand) prevCommand.nextCommand = commandResult;
 			else results.push(commandResult);
 
@@ -37,6 +49,7 @@ export function parseInput(input: string): Command[] {
 }
 
 function normalizeArgs(argsStr: string): string[] {
+	// Remove single and double quotes
 	argsStr = argsStr.replace(/''|""/g, "");
 
 	const args: string[] = [""];
