@@ -1,14 +1,11 @@
-export type CommandObj = {
-	command: string;
-	args: string[];
-	nextCommand?: CommandObj;
-};
+import fs from "fs";
+import { Command } from "./Command";
 
-export function parseInput(input: string): CommandObj[] {
-	const results: CommandObj[] = [];
+export function parseInput(input: string): Command[] {
+	const results: Command[] = [];
 
 	for (const pipe of input.split(" | ")) {
-		let prevCommand: CommandObj | null = null;
+		let prevCommand: Command | null = null;
 
 		for (const commandObj of pipe.split(" && ")) {
 			let command: string;
@@ -28,7 +25,7 @@ export function parseInput(input: string): CommandObj[] {
 
 			const args = normalizeArgs(argsUnparsed.join(" "));
 
-			const commandResult: CommandObj = { command, args };
+			const commandResult = new Command(command, args);
 			if (prevCommand) prevCommand.nextCommand = commandResult;
 			else results.push(commandResult);
 
@@ -74,4 +71,42 @@ function normalizeArgs(argsStr: string): string[] {
 	}
 
 	return args.filter(Boolean);
+}
+
+export function getStreamTargets(args: string[]): {
+	stdout: NodeJS.WritableStream | undefined;
+	stderr: NodeJS.WritableStream | undefined;
+} {
+	if (
+		!(
+			args.includes(">") ||
+			args.includes("1>") ||
+			args.includes("2>") ||
+			args.includes(">>") ||
+			args.includes("1>>") ||
+			args.includes("2>>")
+		)
+	) {
+		return { stdout: undefined, stderr: undefined };
+	}
+
+	const outFile = args[args.length - 1];
+	const flag =
+		args.includes(">") || args.includes("1>") || args.includes("2>")
+			? "w+"
+			: "a+";
+
+	if (args.includes("2>") || args.includes("2>>")) {
+		args.splice(-2);
+		return {
+			stdout: undefined,
+			stderr: fs.createWriteStream(outFile, { flags: flag }),
+		};
+	}
+
+	args.splice(-2);
+	return {
+		stdout: fs.createWriteStream(outFile, { flags: flag }),
+		stderr: undefined,
+	};
 }

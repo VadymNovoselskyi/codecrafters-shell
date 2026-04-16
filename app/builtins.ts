@@ -1,5 +1,6 @@
 import fs from "fs";
 import type { ShellState } from "./ShellState";
+import { getExecPath } from "./helpers";
 
 export const BUILTINS = [
 	"cd",
@@ -14,10 +15,9 @@ export const BUILTINS = [
 type BuiltinName = (typeof BUILTINS)[number];
 
 export type BuiltinContext = {
+	shellState: ShellState;
 	stdout: NodeJS.WritableStream;
 	stderr: NodeJS.WritableStream;
-	findExecPath: (command: string) => string | undefined;
-	shellState: ShellState;
 };
 
 export function isBuiltin(command: string): command is BuiltinName {
@@ -29,7 +29,7 @@ export function runBuiltin(
 	args: string[],
 	context: BuiltinContext,
 ): void {
-	const { stdout, stderr, findExecPath, shellState } = context;
+	const { shellState, stdout, stderr } = context;
 
 	switch (command) {
 		case "cd": {
@@ -102,7 +102,7 @@ export function runBuiltin(
 			if (isBuiltin(searchedCommand)) {
 				stdout.write(`${searchedCommand} is a shell builtin\n`);
 			} else {
-				const execPath = findExecPath(searchedCommand);
+				const execPath = getExecPath(searchedCommand);
 				if (execPath) {
 					stdout.write(`${searchedCommand} is ${execPath}\n`);
 				} else {
