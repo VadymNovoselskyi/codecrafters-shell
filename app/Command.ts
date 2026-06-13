@@ -21,7 +21,7 @@ export class Command {
 		this.nextCommandCondition = nextCommandCondition;
 	}
 
-	getLastCommand(): Command {
+	getEndingCommand(): Command {
 		let command: Command = this;
 		while (command.nextCommand) {
 			command = command.nextCommand;
@@ -155,11 +155,7 @@ export class Command {
 		}
 
 		proc.on("close", (code) => {
-			if (code !== 0 && command.nextCommandCondition === "&&") {
-				finalCallback();
-				return;
-			}
-			if (code === 0 && command.nextCommandCondition === "||") {
+			if ((code !== 0 && command.nextCommandCondition === "&&") || (code === 0 && command.nextCommandCondition === "||")) {
 				finalCallback();
 				return;
 			}
