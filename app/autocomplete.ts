@@ -130,9 +130,10 @@ function handleProgrammableAutocomplete(
   completionPath: string,
   ui: AutocompleteUi,
 ): [string[], string] {
+  const completionArg = args[args.length - 1] ?? "";
   const result = spawnSync(
     completionPath,
-    [executable, args.at(args.length - 1) ?? "", args.at(args.length - 2) ?? ""],
+    [executable, completionArg, args.at(args.length - 2) ?? executable],
     {
       env: { ...process.env, COMP_LINE: line, COMP_POINT: String(line.length) },
       encoding: "utf8",
@@ -148,17 +149,11 @@ function handleProgrammableAutocomplete(
     return [[], line];
   }
 
-  if (lines.length === 1) {
-    args[0] ??= "";
-    args[args.length - 1] = output;
-    return [[executable + " " + args.join(" ") + " "], line];
+  const longestPrefix = getLongestPrefix(completionArg, lines);
+  if (longestPrefix) {
+    filepathTabState = null;
+    return [[line + longestPrefix], line];
   }
-
-  //   const longestPrefix = getLongestPrefix(filename, fileHits);
-  //   if (longestPrefix) {
-  //     filepathTabState = null;
-  //     return [[filename + longestPrefix], filename];
-  //   }
 
   if (!filepathTabState || filepathTabState.line !== line) {
     filepathTabState = { line, count: 0 };
@@ -180,16 +175,19 @@ function fileToString(filename: string, cwd: string): string {
 }
 
 function getLongestPrefix(start: string, candidates: string[]): string {
+  const shortestWord = candidates.reduce((acc: number, candidate: string) => {
+    return Math.min(acc, candidate.length);
+  }, Number.MAX_SAFE_INTEGER);
   let result = "";
   let index = start.length;
 
-  while (true) {
+  while (shortestWord > index) {
     const letters = candidates.reduce((acc: Record<string, number>, candidate: string) => {
       acc[candidate[index]] ??= 1;
       return acc;
     }, {});
 
-    if (Object.keys(letters).length !== 1) break;
+    if (Object.values(letters).length !== 1) break;
     result = result.concat(Object.keys(letters)[0]);
     index++;
   }
