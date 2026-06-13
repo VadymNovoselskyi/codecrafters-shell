@@ -136,6 +136,11 @@ function handleProgrammableAutocomplete(
   const output = result.stdout.toString().trim();
   //   const err = result.stderr;
 
+  if (!output) {
+    filepathTabState = null;
+    ui.write("\x07");
+    return [[], line];
+  }
   return [[line + output + " "], line];
 }
 
