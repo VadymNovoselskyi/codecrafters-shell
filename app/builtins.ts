@@ -128,10 +128,16 @@ export function runBuiltin(command: BuiltinName, args: string[], context: Builti
         } catch {
           stderr.write(`declare: ${variableName}: not found\n`);
         }
-      } else {
-        const [variableName, value] = args[0].split("=");
-        shellState.variablesState.setVariable(variableName, value);
+        return 0;
       }
+
+      const [variableName, value] = args[0].split("=");
+      if (!/^[a-zA-Z_]\w*$/.test(variableName)) {
+        stderr.write(`declare: \`${args[0]}\`: not a valid identifier\n`);
+        return 0;
+      }
+
+      shellState.variablesState.setVariable(variableName, value);
 
       return 0;
     }
