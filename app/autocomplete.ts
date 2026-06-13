@@ -139,6 +139,7 @@ function handleProgrammableAutocomplete(
     },
   );
   const output = result.stdout.toString().trim();
+  const lines = output.split("\n");
   //   const err = result.stderr;
 
   if (!output) {
@@ -147,9 +148,31 @@ function handleProgrammableAutocomplete(
     return [[], line];
   }
 
-  args[0] ??= "";
-  args[args.length - 1] = output;
-  return [[executable + " " + args.join(" ") + " "], line];
+  if (lines.length === 1) {
+    args[0] ??= "";
+    args[args.length - 1] = output;
+    return [[executable + " " + args.join(" ") + " "], line];
+  }
+
+  //   const longestPrefix = getLongestPrefix(filename, fileHits);
+  //   if (longestPrefix) {
+  //     filepathTabState = null;
+  //     return [[filename + longestPrefix], filename];
+  //   }
+
+  if (!filepathTabState || filepathTabState.line !== line) {
+    filepathTabState = { line, count: 0 };
+  }
+  filepathTabState.count++;
+  if (filepathTabState.count % 2 === 1) {
+    ui.write("\x07");
+    return [[], line];
+  }
+  filepathTabState = null;
+
+  ui.write("\n" + lines.join("  ") + "\n");
+  ui.redraw(line);
+  return [[], line];
 }
 
 function fileToString(filename: string, cwd: string): string {
