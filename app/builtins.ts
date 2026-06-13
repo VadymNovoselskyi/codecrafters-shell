@@ -119,6 +119,23 @@ export function runBuiltin(command: BuiltinName, args: string[], context: Builti
       return 0;
     }
 
+    case "declare": {
+      if (args[0] === "-p") {
+        const variableName = args[1];
+        try {
+          const value = shellState.variablesState.getVariable(variableName);
+          stdout.write(`declare -- ${variableName}="${value}"\n`);
+        } catch {
+          stderr.write(`declare: ${variableName}: not found\n`);
+        }
+      } else {
+        const [variableName, value] = args[0].split("=");
+        shellState.variablesState.setVariable(variableName, value);
+      }
+
+      return 0;
+    }
+
     case "exit": {
       shellState.exitRequested = true;
       return 0;
