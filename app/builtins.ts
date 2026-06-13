@@ -133,7 +133,7 @@ export function runBuiltin(command: BuiltinName, args: string[], context: Builti
 
       const [variableName, value] = args[0].split("=");
       if (!/^[a-zA-Z_]\w*$/.test(variableName)) {
-        stderr.write(`declare: \`${args[0]}\`: not a valid identifier\n`);
+        stderr.write(`declare: \`${args[0]}\': not a valid identifier\n`);
         return 0;
       }
 
