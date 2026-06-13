@@ -130,9 +130,11 @@ function handleProgrammableAutocomplete(
   completionPath: string,
   ui: AutocompleteUi,
 ): [string[], string] {
-  const result = spawnSync(completionPath, [], {
-    stdio: ["inherit", "pipe", "pipe"],
-  });
+  const result = spawnSync(completionPath, [
+    executable,
+    args.at(args.length - 1) ?? "",
+    args.at(args.length - 2) ?? "",
+  ]);
   const output = result.stdout.toString().trim();
   //   const err = result.stderr;
 
@@ -141,7 +143,10 @@ function handleProgrammableAutocomplete(
     ui.write("\x07");
     return [[], line];
   }
-  return [[line + output + " "], line];
+
+  args[0] ??= "";
+  args[args.length - 1] = output;
+  return [[executable + " " + args.join(" ") + " "], line];
 }
 
 function fileToString(filename: string, cwd: string): string {
