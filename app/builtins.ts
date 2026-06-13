@@ -2,7 +2,16 @@ import fs from "fs";
 import type { ShellState } from "./ShellState";
 import { getExecPath } from "./pathHelpers";
 
-export const BUILTINS = ["cd", "pwd", "echo", "history", "jobs", "exit", "type"] as const;
+export const BUILTINS = [
+  "cd",
+  "pwd",
+  "echo",
+  "history",
+  "jobs",
+  "complete",
+  "exit",
+  "type",
+] as const;
 
 type BuiltinName = (typeof BUILTINS)[number];
 
