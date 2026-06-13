@@ -9,6 +9,7 @@ export const BUILTINS = [
   "history",
   "jobs",
   "complete",
+  "declare",
   "exit",
   "type",
 ] as const;
