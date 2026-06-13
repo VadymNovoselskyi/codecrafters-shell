@@ -3,11 +3,13 @@
   "description": "Build your own Shell challenge, from CodeCrafters",
   "type": "module",
   "scripts": {
-    "dev": "bun run app/main.ts"
+    "dev": "bun run app/main.ts",
+    "style": "bun run prettier --write app"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/node": "^25.6.0",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.2",
+    "prettier": "^3.8.4"
   }
 }

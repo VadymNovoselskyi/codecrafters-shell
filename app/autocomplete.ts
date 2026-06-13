@@ -24,7 +24,7 @@ export function handleAutocomplete(line: string, ui: AutocompleteUi): [string[],
 
 function handleCommandAutocomplete(command: string, ui: AutocompleteUi): [string[], string] {
   // Handle builtin command autocomplete
-  const builtinHits = BUILTINS.filter((cmd) => cmd.startsWith(command)).sort();
+  const builtinHits = BUILTINS.filter(cmd => cmd.startsWith(command)).sort();
 
   if (!builtinHits.length) {
     ui.write("\x07");
@@ -43,7 +43,7 @@ function handleCommandAutocomplete(command: string, ui: AutocompleteUi): [string
 
   // Handle path executables autocomplete
   const pathHits = getPathExecs()
-    .filter((cmd) => cmd.startsWith(command))
+    .filter(cmd => cmd.startsWith(command))
     .sort();
 
   if (!pathHits.length) return [[], command];
@@ -78,7 +78,7 @@ function handleFilepathAutocomplete(
   if (!fs.existsSync(cwd)) return [[], line];
 
   const files = fs.readdirSync(cwd);
-  const fileHits = filename ? files.filter((file) => file.startsWith(filename)).sort() : files;
+  const fileHits = filename ? files.filter(file => file.startsWith(filename)).sort() : files;
 
   if (!fileHits.length) {
     filepathTabState = null;
@@ -108,7 +108,7 @@ function handleFilepathAutocomplete(
   }
   filepathTabState = null;
 
-  ui.write("\n" + fileHits.map((file) => fileToString(file, cwd)).join("  ") + "\n");
+  ui.write("\n" + fileHits.map(file => fileToString(file, cwd)).join("  ") + "\n");
   ui.redraw(line);
   return [[], line];
 }
