@@ -72,6 +72,15 @@ function normalizeArgs(argsStr: string, variablesState: VariablesState): string[
       }
     } else if (char === "$" && !inSingleQuotes) {
       inVariableExpansion = true;
+    } else if (char === "{" && !inSingleQuotes) {
+      continue;
+    } else if (char === "}" && !inSingleQuotes && inVariableExpansion) {
+      inVariableExpansion = false;
+      try {
+        const variableValue = variablesState.getVariable(expendedVariableName);
+        args[wordIndex] = args[wordIndex].concat(variableValue);
+      } catch {}
+      expendedVariableName = "";
     } else if (/\S/.test(char) && inVariableExpansion) {
       expendedVariableName = expendedVariableName.concat(char);
     }
