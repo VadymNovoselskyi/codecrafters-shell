@@ -133,7 +133,7 @@ function handleProgrammableAutocomplete(
   const completionArg = args[args.length - 1] ?? "";
   const result = spawnSync(
     completionPath,
-    [executable, completionArg, args.at(args.length - 2) ?? executable],
+    [executable, completionArg, args[args.length - 2] ?? executable],
     {
       env: { ...process.env, COMP_LINE: line, COMP_POINT: String(line.length) },
       encoding: "utf8",
