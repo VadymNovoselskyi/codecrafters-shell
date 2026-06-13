@@ -92,6 +92,16 @@ export function runBuiltin(command: BuiltinName, args: string[], context: Builti
       return 0;
     }
 
+    case "complete": {
+      const flag = args[0];
+      if (flag === "-p") {
+        const target = args[1];
+        stderr.write(`complete: ${target}: no completion specification\n`);
+      }
+
+      return 0;
+    }
+
     case "exit": {
       shellState.exitRequested = true;
       return 0;
