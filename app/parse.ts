@@ -1,7 +1,8 @@
 import fs from "fs";
 import { Command } from "./Command";
+import type { VariablesState } from "./VariablesState";
 
-export function parseInput(input: string): Command[] {
+export function parseInput(input: string, virablesState: VariablesState): Command[] {
   const results: Command[] = [];
 
   // Split on | only when it is not part of || (list OR) (chat GPT)
@@ -30,7 +31,7 @@ export function parseInput(input: string): Command[] {
         [command, ...argsUnparsed] = commandObj.split(" ");
       }
 
-      const args = normalizeArgs(argsUnparsed.join(" "));
+      const args = normalizeArgs(argsUnparsed.join(" "), virablesState);
 
       const commandResult = new Command(command, args, undefined, nextCommandCondition);
       if (prevCommand) prevCommand.nextCommand = commandResult;
@@ -43,7 +44,7 @@ export function parseInput(input: string): Command[] {
   return results;
 }
 
-function normalizeArgs(argsStr: string): string[] {
+function normalizeArgs(argsStr: string, variablesState: VariablesState): string[] {
   // Remove single and double quotes
   argsStr = argsStr.replace(/''|""/g, "");
 
@@ -51,13 +52,15 @@ function normalizeArgs(argsStr: string): string[] {
   let wordIndex = 0;
   let inSingleQuotes = false;
   let inDoubleQuotes = false;
+  let inVariableExpansion = false;
+  let expendedVariableName = "";
 
   for (let i = 0; i < argsStr.length; i++) {
     const char = argsStr[i];
 
-    if (char === "'" && !inDoubleQuotes) {
+    if (char === "\'" && !inDoubleQuotes) {
       inSingleQuotes = !inSingleQuotes;
-    } else if (char === '"' && !inSingleQuotes) {
+    } else if (char === '\"' && !inSingleQuotes) {
       inDoubleQuotes = !inDoubleQuotes;
     } else if (char === "\\") {
       if (!inSingleQuotes && !inDoubleQuotes) {
@@ -67,13 +70,31 @@ function normalizeArgs(argsStr: string): string[] {
       } else if ((inDoubleQuotes && argsStr[i + 1] === '"') || argsStr[i + 1] === "\\") {
         args[wordIndex] = args[wordIndex].concat(argsStr[++i]);
       }
-    } else if (/\S/.test(char) || inSingleQuotes || inDoubleQuotes) {
+    } else if (char === "$" && !inSingleQuotes) {
+      inVariableExpansion = true;
+    } else if (/\S/.test(char) && inVariableExpansion) {
+      expendedVariableName = expendedVariableName.concat(char);
+    }
+    //  else if (char === " " && inVariableExpansion && inDoubleQuotes) {}
+    else if (/\S/.test(char) || inSingleQuotes || inDoubleQuotes) {
       args[wordIndex] = args[wordIndex].concat(char);
-    } else if (char === " " && args[wordIndex].length !== 0) {
+    } else if (char === " " && (args[wordIndex].length !== 0 || inVariableExpansion)) {
+      if (inVariableExpansion) {
+        inVariableExpansion = false;
+        try {
+          const variableValue = variablesState.getVariable(expendedVariableName);
+          args[wordIndex] = args[wordIndex].concat(variableValue);
+        } catch {}
+        expendedVariableName = "";
+      }
       args.push("");
       wordIndex++;
     }
   }
+  try {
+    const variableValue = variablesState.getVariable(expendedVariableName);
+    args[wordIndex] = args[wordIndex].concat(variableValue);
+  } catch {}
 
   return args.filter(Boolean);
 }

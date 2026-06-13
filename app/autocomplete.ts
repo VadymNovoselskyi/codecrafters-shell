@@ -2,7 +2,7 @@ import fs from "fs";
 import { BUILTINS } from "./builtins";
 import { parseInput } from "./parse";
 import { getPathExecs } from "./pathHelpers";
-import type { CompletionState } from "./CompletionState";
+import type { ShellState } from "./ShellState";
 import { spawnSync } from "child_process";
 
 let filepathTabState: { line: string; count: number } | null = null;
@@ -14,17 +14,17 @@ export type AutocompleteUi = {
 
 export function handleAutocomplete(
   line: string,
-  completionState: CompletionState,
+  shellState: ShellState,
   ui: AutocompleteUi,
 ): [string[], string] {
-  const pipes = parseInput(line);
+  const pipes = parseInput(line, shellState.variablesState);
   let { executable, args } = pipes[pipes.length - 1].getEndingCommand();
 
   if (!args.length && !line.endsWith(" ")) {
     return handleCommandAutocomplete(executable, ui);
   } else {
     try {
-      const path = completionState.getCompletion(executable);
+      const path = shellState.completionState.getCompletion(executable);
       return handleProgrammableAutocomplete(line, executable, args, path, ui);
     } catch (_) {
       return handleFilepathAutocomplete(line, args, ui);

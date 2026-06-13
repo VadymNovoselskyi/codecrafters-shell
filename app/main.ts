@@ -14,7 +14,7 @@ const rl = createInterface({
   output: process.stdout,
   prompt: "$ ",
   completer: (line: string) =>
-    handleAutocomplete(line, shellState.completionState, {
+    handleAutocomplete(line, shellState, {
       write: (text: string) => fs.writeSync(1, text),
       redraw: (lineToDraw: string) => {
         rl.write(null, { ctrl: true, name: "u" });
@@ -29,7 +29,7 @@ rl.on("line", async input => {
   shellState.history.push(input);
   shellState.exitRequested = false;
 
-  const stages = parseInput(input);
+  const stages = parseInput(input, shellState.variablesState);
   const runs: Promise<number>[] = [];
   let upstream: NodeJS.ReadableStream | undefined;
 
