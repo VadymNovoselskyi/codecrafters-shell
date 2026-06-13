@@ -130,11 +130,14 @@ function handleProgrammableAutocomplete(
   completionPath: string,
   ui: AutocompleteUi,
 ): [string[], string] {
-  const result = spawnSync(completionPath, [
-    executable,
-    args.at(args.length - 1) ?? "",
-    args.at(args.length - 2) ?? "",
-  ]);
+  const result = spawnSync(
+    completionPath,
+    [executable, args.at(args.length - 1) ?? "", args.at(args.length - 2) ?? ""],
+    {
+      env: { ...process.env, COMP_LINE: line, COMP_POINT: String(line.length) },
+      encoding: "utf8",
+    },
+  );
   const output = result.stdout.toString().trim();
   //   const err = result.stderr;
 
