@@ -17,4 +17,8 @@ export class CompletionState {
 
     return path;
   }
+
+  removeCompletion(command: string) {
+    delete this.completions[command];
+  }
 }

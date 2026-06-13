@@ -104,6 +104,11 @@ export function runBuiltin(command: BuiltinName, args: string[], context: Builti
         }
       }
 
+      if (flag === "-r") {
+        const command = args[1];
+        shellState.completionState.removeCompletion(command);
+      }
+
       if (flag === "-C") {
         const path = args[1];
         const command = args[2];
