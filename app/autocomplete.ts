@@ -152,7 +152,7 @@ function handleProgrammableAutocomplete(
   const longestPrefix = getLongestPrefix(completionArg, lines);
   if (longestPrefix) {
     filepathTabState = null;
-    return [[line + longestPrefix], line];
+    return [[line + longestPrefix + (lines.length === 1 ? " " : "")], line];
   }
 
   if (!filepathTabState || filepathTabState.line !== line) {
