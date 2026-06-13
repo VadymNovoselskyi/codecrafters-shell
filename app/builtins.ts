@@ -95,8 +95,19 @@ export function runBuiltin(command: BuiltinName, args: string[], context: Builti
     case "complete": {
       const flag = args[0];
       if (flag === "-p") {
-        const target = args[1];
-        stderr.write(`complete: ${target}: no completion specification\n`);
+        const command = args[1];
+        try {
+          const path = shellState.completionState.getCompletion(command);
+          stdout.write(`complete -C '${path}' ${command}\n`);
+        } catch {
+          stderr.write(`complete: ${command}: no completion specification\n`);
+        }
+      }
+
+      if (flag === "-C") {
+        const path = args[1];
+        const command = args[2];
+        shellState.completionState.setCompletion(command, path);
       }
 
       return 0;
