@@ -14,7 +14,7 @@ const rl = createInterface({
   output: process.stdout,
   prompt: "$ ",
   completer: (line: string) =>
-    handleAutocomplete(line, {
+    handleAutocomplete(line, shellState.completionState, {
       write: (text: string) => fs.writeSync(1, text),
       redraw: (lineToDraw: string) => {
         rl.write(null, { ctrl: true, name: "u" });

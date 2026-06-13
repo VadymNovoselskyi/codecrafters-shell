@@ -1,8 +1,9 @@
 import fs from "fs";
-import path from "path";
 import { BUILTINS } from "./builtins";
 import { parseInput } from "./parse";
 import { getPathExecs } from "./pathHelpers";
+import type { CompletionState } from "./CompletionState";
+import { spawnSync } from "child_process";
 
 let filepathTabState: { line: string; count: number } | null = null;
 
@@ -11,14 +12,23 @@ export type AutocompleteUi = {
   redraw: (line: string) => void;
 };
 
-export function handleAutocomplete(line: string, ui: AutocompleteUi): [string[], string] {
+export function handleAutocomplete(
+  line: string,
+  completionState: CompletionState,
+  ui: AutocompleteUi,
+): [string[], string] {
   const pipes = parseInput(line);
   let { executable, args } = pipes[pipes.length - 1].getEndingCommand();
 
   if (!args.length && !line.endsWith(" ")) {
     return handleCommandAutocomplete(executable, ui);
   } else {
-    return handleFilepathAutocomplete(line, args, ui);
+    try {
+      const path = completionState.getCompletion(executable);
+      return handleProgrammableAutocomplete(line, executable, args, path, ui);
+    } catch (_) {
+      return handleFilepathAutocomplete(line, args, ui);
+    }
   }
 }
 
@@ -111,6 +121,22 @@ function handleFilepathAutocomplete(
   ui.write("\n" + fileHits.map(file => fileToString(file, cwd)).join("  ") + "\n");
   ui.redraw(line);
   return [[], line];
+}
+
+function handleProgrammableAutocomplete(
+  line: string,
+  executable: string,
+  args: string[],
+  completionPath: string,
+  ui: AutocompleteUi,
+): [string[], string] {
+  const result = spawnSync(completionPath, [], {
+    stdio: ["inherit", "pipe", "pipe"],
+  });
+  const output = result.stdout.toString().trim();
+  //   const err = result.stderr;
+
+  return [[line + output + " "], line];
 }
 
 function fileToString(filename: string, cwd: string): string {
